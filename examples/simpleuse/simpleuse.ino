@@ -1,40 +1,34 @@
 #include "MazeSolvingGR.h"
 
-void mode1(){
+void initMazeRobot(){ // fungsi untuk inisialisasi 
   start(1,100); // mulai robot dengan menggunakan buzzer dan set pcTime ke 100ms, bisa diatur sesuai kebutuhan
   error(1,200); // gunakan fungsi error agar saat robot keluar jalur lebih dari 200ms, robot akan berhenti
-  linecolor(black); // atur robot untuk memulai dengan garis berwarna hitam
+  
+  // fungsi dibawah ini bisa diatur di dalam mode1,mode2 atau mode3
   linetrack(2); // atur lebar line ke 2 sensor
-  controller(-1,-1,-1); // kp, ki dan kd default untuk sensor
-  // setup awal selesai
-  sensor(ff);
-  line(pp,ff,10,0);
+  sensor(ff); // gunakan sensor depan
+  linecolor(black); // atur robot untuk memulai dengan garis berwarna hitam
+  controller(-1,-1,-1); // kp, ki dan kd default untuk sensor garis
+}
 
-mode1_1: // tambahkan kode dibawah mode1_1 untuk menandai bahwa robot telah melewati setpoint 1 mode 1, setpoint bisa diatur sampai mode1_20
-mode1_2:
-mode1_3:
-mode1_4:
+void mode1(){
+  step(); // setpoint 0 -> garis start
+  linefind(5,5,3000);
+  line(pp,ff,10,0);
+  step(); // setpoint 1 
+  line(pp,ff,11,0);
+  step(); // setpoint 2
+  line(pp,ff,12,0);
   buzzer(3,200,200); // tandai kalau robot telah berhenti dengan buzzer, bisa diganti seperlunya  
 };
 
 void mode2(){
-  start(1,100);
-  linecolor(white);
-
-mode2_1: // tambahkan kode dibawah mode2_1 untuk menandai bahwa robot telah melewati setpoint 1 mode 2
-mode2_2:
-mode2_3:
-mode2_4:
-  buzzer(3,200,200); // tandai kalau robot telah berhenti dengan buzzer, bisa diganti seperlunya
+  step();
+  lostline(100,10,10,0);
+  step();
+  line(pp,ff,11,0);
 };
 
 void mode3(){
-  start(1,100);
-  linecolor(black);
-  
-mode3_1: // tambahkan kode dibawah mode1_1 untuk menandai bahwa robot telah melewati setpoint 1 mode 1
-mode3_2:
-mode3_3:
-mode3_4:
-  buzzer(3,200,200); // tandai kalau robot telah berhenti dengan buzzer, bisa diganti seperlunya
+
 };
