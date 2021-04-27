@@ -33,7 +33,7 @@ bool isUseBuzzer = true; // flag menggunakan buzzer atau tidak
 bool isTraceForward = true; // flag jalan kedepan atau kebelakang
 bool isUseError = true; // flag untuk menggunakan fungsi error jika tidak mendeteksi gariss
 bool isErrorDetect = false; // flag jika terdeteksi error
-bool isMirror = false; // flag untuk mode mirroring atau tidak
+// bool isMirror = false; // flag untuk mode mirroring atau tidak
 bool isModeCount = false; // flag untuk fungsi stepcount agar robot tidak bergerak
 
 int8_t runMode = 1; // flag untuk mode1 ,mode2 atau mode3
@@ -102,8 +102,8 @@ void readSensor(bool wichSensor){
   }
 }
 // fungsi pembacaan tombol  
-#define MAX_DETECT 20
-#define MIN_DETECT 15
+#define MAX_DETECT 7
+#define MIN_DETECT 4
 #define isBtn1 isBtnMode
 #define isBtn2 isBtnStep
 #define isBtn3 isBtnDebug
@@ -144,33 +144,6 @@ bool isBtnDebug(){
   if(cnt > MIN_DETECT) return true;
   return false;
 }
-// fungsi untuk mengambil nilai pixel dari sdcard dan menampilkan full 1 layar ke ssd1306
-void showIcon(String filename){
-  File file;
-  filename = "icon/" + filename;
-  file = SD.open(filename);
-  if(file){
-    uint16_t i = 0;
-    uint8_t icon[1024] = { 0 };
-    filename = "";
-    while(file.available()){
-      char C = file.read();
-      if(isDigit(C)){
-        filename += C;
-      } else {
-        icon[i] = filename.toInt();
-        filename = "";
-        if(++i == 1024){
-          display.clearDisplay();
-          display.setCursor(0,0);
-          display.drawBitmap(0,0,icon,128,64,WHITE);
-          display.display();
-        }
-      }
-    }
-    file.close();
-  }
-}
 // fungsi untuk mengambil format string dari sd card untuk menghemat flash memory untuk keperluan log
 String getText(uint8_t i){
   char filename[16] = {0};
@@ -185,6 +158,35 @@ String getText(uint8_t i){
     file.close();
   }
   return temp;
+}
+const char mode_n[3] = "md";
+// fungsi mengambil last mode yang dijalankan oleh robot
+void getLastMode(){
+  File file;
+  if(!SD.exists(mode_n)){
+    runMode = 1;
+    file = SD.open(mode_n, FILE_WRITE);
+    file.write('1');
+  } else {
+    file = SD.open(mode_n);
+    switch ((char) file.read()){
+      case '1': runMode = 1; break;
+      case '2': runMode = 2; break;
+      case '3': runMode = 3; break;
+    }
+  }
+  file.close();
+}
+// fungsi menyimpan last mode yang dijalankan oleh robot
+void setLastMode(){
+  SD.remove(mode_n);
+  File file;
+  switch(runMode){
+    case 1: file = SD.open(mode_n, FILE_WRITE); file.write('1'); break;
+    case 2: file = SD.open(mode_n, FILE_WRITE); file.write('2'); break;
+    case 3: file = SD.open(mode_n, FILE_WRITE); file.write('3'); break;
+  }
+  file.close();
 }
 // fungsi menghitung berapa jumlah setpoint yang diatur dari masing masing mode
 void countSetpoint(){
@@ -202,7 +204,8 @@ void countSetpoint(){
 void logPrint(String newLog){
   display.clearDisplay();
   display.setCursor(0,0);
-  display.print(runMode); display.print(F(" / ")); display.print(isMirror ? getText(31):getText(32)); display.print(F(" / ")); 
+  display.print(runMode); display.print(F(" / "));
+  // display.print(runMode); display.print(F(" / ")); display.print(isMirror ? getText(31):getText(32)); display.print(F(" / ")); 
   switch (debug){
     case no_debug: display.println(getText(13)); break;
     case by_func: display.println(getText(14)); break;
@@ -312,10 +315,10 @@ void displayMenu(){
   display.println(getText(16));
   display.setCursor(0,48);
   readSensor(ff);
-  sprintf(d, "F: %d%d%d%d %d%d%d%d", senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7]);
+  sprintf(d,getText(73).c_str(), senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7]);
   display.println(d);
   readSensor(bb);
-  sprintf(d, "R: %d%d%d%d %d%d%d%d", senData[7], senData[6], senData[5], senData[4], senData[3], senData[2], senData[1], senData[0]);
+  sprintf(d,getText(74).c_str(), senData[7], senData[6], senData[5], senData[4], senData[3], senData[2], senData[1], senData[0]);
   display.println(d);
   display.display();
 }
@@ -336,6 +339,7 @@ void errorRaised(){
     delay(DELAY_BUZZER);
     if(line != 0) break;
   }
+  logPrint(F("run"));
 }
 // fungsi yang menjalankan motor sesuai PID untuk sensor garis
 void controllerRun(uint8_t line, int8_t speed, bool useError = true){
@@ -772,12 +776,8 @@ void testSensor(bool wichSensor){
   while(digitalRead(btnGo)){
     readSensor(wichSensor);
 
-    char D[20] = {0};
-    sprintf(D, "%d%d%d%d%d%d%d%d\n%d%d%d%d%d%d%d%d", 
-      senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7],
-      !senData[0], !senData[1], !senData[2], !senData[3], !senData[4], !senData[5], !senData[6], !senData[7]
-    );
-    printDisplayHome(D);
+    sprintf(d,getText(75).c_str(),senData[0],senData[1],senData[2],senData[3],senData[4],senData[5],senData[6],senData[7]);
+    printDisplayHome(d);
 
     delay(10);
   }
@@ -849,7 +849,7 @@ void calibSensor(bool wichSensor){
     }
 
     int timeSpent = ((unsigned long) millis()-timeStart) / 1000;
-    sprintf(d, "%d", timeSpent);
+    sprintf(d,getText(76).c_str(), timeSpent);
     printDisplayHome(d);
 
     delay(900);
@@ -866,11 +866,15 @@ void calibSensor(bool wichSensor){
 /****************************** Fungsi yang bisa dijalankan oleh pengguna *********************************/
 // fungsi untuk menandai setpoint mulai setpoint 0 -> sampai seterusnya
 void step(){
-  ++nFunc;
   ++mStep;
+  if(mStep < nStep) return; 
   delay(stepDelay);
 
-  if(debug == by_step) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
+  if(debug == by_step) {
+    sprintf(d, getText(72).c_str(),mStep);
+    logPrint(d);
+    while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);
+  }
 }
 // sudah
 void setStepDelay(uint16_t time){
@@ -1615,6 +1619,7 @@ void setup(){
     }
   }
   initMazeRobot();
+  getLastMode();
   unsigned long tLcd = millis();
   countSetpoint();
 
@@ -1756,7 +1761,7 @@ void setup(){
       delay(DELAY_BUZZER);
       digitalWrite(buzz, 0);
     }
-    if((unsigned long) millis()-tLcd >= 100){
+    if((unsigned long) millis()-tLcd >= 50){
       displayMenu();
       tLcd = millis();
     }
@@ -1774,37 +1779,38 @@ void setup(){
     default: debug = 0; break;
   }
   display.println();
-  display.println(getText(29));
+  display.println();
+  // display.println(getText(29));
   display.println(getText(30));
   display.display();
   while(1){
-    if(isBtnGo() && (unsigned long) millis()-tButton >= DELAY_BUTTON){ isMirror = false; break; }
-    if(isBtnDebug() && (unsigned long) millis()-tButton >= DELAY_BUTTON){ isMirror = true; break; }
+    if(isBtnGo() && (unsigned long) millis()-tButton >= DELAY_BUTTON){ 
+      // isMirror = false; 
+      break; 
+    }
+    // if(isBtnDebug() && (unsigned long) millis()-tButton >= DELAY_BUTTON){ isMirror = true; break; }
   }
 
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.print(runMode); display.print(F(" / ")); display.print(isMirror ? getText(31):getText(32)); display.print(F(" / ")); 
-  switch (debug){
-    case no_debug: display.println(getText(13)); break;
-    case by_func: display.println(getText(14)); break;
-    case by_step: display.println(getText(15)); break;
-  }
-  display.println(getText(33));
-  display.display();
+  logPrint(F("run"));
   
   tButton = millis();
   nFunc = 0;
   mStep = -1; // mulai dari -1 sebelum ke setpoint 0
-  startTime = millis(); // catat waktu pertama mulai
+  setLastMode();
 
+  startTime = millis(); // catat waktu pertama mulai
   switch (runMode){
     case 1: mode1(); break;
     case 2: mode2(); break;
     case 3: mode3(); break;
   }
+
+  char tf[15] = {0};
+  dtostrf((millis()-startTime)/1000.0,10,3,tf);
+  sprintf(d,getText(77).c_str(),tf);
+  logPrint(d);
 }
 
 void loop(){ 
-  buzzerled(1,1,2,50);
+
 }
