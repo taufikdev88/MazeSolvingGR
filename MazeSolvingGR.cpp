@@ -1607,6 +1607,8 @@ void setup(){
   digitalWrite(LED_BUILTIN, 0);
   digitalWrite(buzz, 0);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+  display.display();
+  delay(100);
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
