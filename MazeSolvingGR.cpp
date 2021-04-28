@@ -633,7 +633,7 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
   crossDetected = false;
   switch(dir){
     case ll:
-    while(!crossDetected || (!senData[4] && !senData[5])){
+    while(!crossDetected || (!senData[3] && !senData[4])){
       if(isTraceForward){
         motor_f(-speed,speed,0);
         readSensor(ff);
@@ -641,11 +641,11 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
         motor_f(speed,-speed,0);
         readSensor(bb);
       }
-      if(senData[0]) crossDetected = true;
+      if(senData[1]) crossDetected = true;
     }
     break;
     case rr:
-    while(!crossDetected || (!senData[3] && !senData[2])){
+    while(!crossDetected || (!senData[3] && !senData[4])){
       if(isTraceForward){
         motor_f(speed,-speed,0);
         readSensor(ff);
@@ -653,7 +653,7 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
         motor_f(-speed,speed,0);
         readSensor(bb);
       }
-      if(senData[7]) crossDetected = true;
+      if(senData[6]) crossDetected = true;
     }
     break; 
   }
