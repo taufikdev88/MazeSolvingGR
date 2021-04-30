@@ -108,7 +108,7 @@ void readSensor(bool wichSensor){
   }
 
   if(!isSuccess){
-    for(uin8_t i=0; i<8; i++){
+    for(uint8_t i=0; i<8; i++){
       senData[i] = 0;
     }
   }
