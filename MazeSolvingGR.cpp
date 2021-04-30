@@ -84,8 +84,13 @@ void readSensor(bool wichSensor){
   if(wichSensor == ff) os = &fsensor;
   else os = &bsensor;
   os->write('A');
+  bool isSuccess = false;
+  unsigned long timewait = millis();
   for(uint8_t i=0; i<10; i++){
-    while(!os->available());
+    while(!os->available()){
+      if((unsigned long) millis()-timewait > 50) break;
+    };
+
     char in = os->read();
     if(i == 0){
       if( in != 'H') break;
@@ -98,6 +103,13 @@ void readSensor(bool wichSensor){
         senData[i] = temp[i];
       }
       i = 10; // keluar loop
+      isSuccess = true;
+    }
+  }
+
+  if(!isSuccess){
+    for(uin8_t i=0; i<8; i++){
+      senData[i] = 0;
     }
   }
 }
