@@ -247,38 +247,45 @@ void senData2Bin(uint8_t *line){
   if(senData[7]) *line = *line | 0b00000001;
 }
 // fungsi untuk menjalankan motor kanan kiri berdasarkan skala pwm speed 0-20 
+void kinematik(int8_t leftSpeed, int8_t rightSpeed){
+  float fSpeed = 0.0;
+  if(leftSpeed < 0){
+    // mundur
+    fSpeed = (float) leftSpeed / -20.0;
+    fSpeed = constrain(((fSpeed * 255.0) + leftMotorStartPwmB), 0, 255);
+    analogWrite(pwm1, fSpeed );
+    analogWrite(pwm2, 0);
+  } else {
+    // maju
+    fSpeed = (float) leftSpeed / 20.0;
+    fSpeed = constrain(((fSpeed * 255.0) + leftMotorStartPwmF), 0, 255);
+    analogWrite(pwm1, 0);
+    analogWrite(pwm2, fSpeed);
+  }
+  if(rightSpeed < 0){
+    // mundur
+    fSpeed = (float) rightSpeed / -20.0;
+    fSpeed = constrain(((fSpeed * 255.0) + rightMotorStartPwmB), 0, 255);  
+    analogWrite(pwm3, fSpeed);
+    analogWrite(pwm4, 0);
+  } else {
+    // maju
+    fSpeed = (float) rightSpeed / 20.0;
+    fSpeed = constrain(((fSpeed * 255.0) + rightMotorStartPwmF), 0, 255);
+    analogWrite(pwm3, 0);
+    analogWrite(pwm4, fSpeed);
+  }
+}
 void motor_f(int8_t leftSpeed, int8_t rightSpeed, uint16_t runTime = 0){
   leftSpeed = constrain(leftSpeed, -20, 20);
   rightSpeed = constrain(rightSpeed, -20, 20);
-  float fSpeed = 0.0;
-  unsigned long timeStart = millis();
-  while((unsigned long) millis()-timeStart <= runTime){
-    if(leftSpeed < 0){
-      // mundur
-      fSpeed = (float) leftSpeed / -20.0;
-      fSpeed = constrain(((fSpeed * 255.0) + leftMotorStartPwmB), 0, 255);
-      analogWrite(pwm1, fSpeed );
-      analogWrite(pwm2, 0);
-    } else {
-      // maju
-      fSpeed = (float) leftSpeed / 20.0;
-      fSpeed = constrain(((fSpeed * 255.0) + leftMotorStartPwmF), 0, 255);
-      analogWrite(pwm1, 0);
-      analogWrite(pwm2, fSpeed);
+  if(runTime > 0){
+    unsigned long timeStart = millis();
+    while((unsigned long) millis()-timeStart <= runTime){
+      kinematik(leftSpeed, rightSpeed);
     }
-    if(rightSpeed < 0){
-      // mundur
-      fSpeed = (float) rightSpeed / -20.0;
-      fSpeed = constrain(((fSpeed * 255.0) + rightMotorStartPwmB), 0, 255);  
-      analogWrite(pwm3, fSpeed);
-      analogWrite(pwm4, 0);
-    } else {
-      // maju
-      fSpeed = (float) rightSpeed / 20.0;
-      fSpeed = constrain(((fSpeed * 255.0) + rightMotorStartPwmF), 0, 255);
-      analogWrite(pwm3, 0);
-      analogWrite(pwm4, fSpeed);
-    }
+  } else {
+    kinematik(leftSpeed, rightSpeed);
   }
   if(runTime != 0){
     analogWrite(pwm1, 0);
