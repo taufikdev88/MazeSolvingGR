@@ -363,19 +363,19 @@ void controllerRun(uint8_t line, int8_t speed, bool useError = true){
 //    case 0b00000001: error = 28; isErrorDetect = false; break;
 
     // garis 3 sensor
-//    case 0b11100000: if(linecount >= 3) error = -8; isErrorDetect = false; break;
-    case 0b01110000: if(linecount >= 3) error = -12; isErrorDetect = false; break;
+//    case 0b11100000: if(linecount >= 3) error = -28; isErrorDetect = false; break;
+    case 0b01110000: if(linecount >= 3) error = -24; isErrorDetect = false; break;
     case 0b00111000: if(linecount >= 3) error = -4; isErrorDetect = false; break;
     case 0b00011100: if(linecount >= 3) error = 4; isErrorDetect = false; break;
-    case 0b00001110: if(linecount >= 3) error = 12; isErrorDetect = false; break;
-//    case 0b00000111: if(linecount >= 3) error = 16; isErrorDetect = false; break;
+    case 0b00001110: if(linecount >= 3) error = 24; isErrorDetect = false; break;
+//    case 0b00000111: if(linecount >= 3) error = 28; isErrorDetect = false; break;
 
     // garis 4 sensor 
 //    case 0b11110000: if(linecount == 4) error = -8; isErrorDetect = false; break;
-    case 0b01111000: if(linecount == 4) error = -8; isErrorDetect = false; break;
+    case 0b01111000: if(linecount == 4) error = -28; isErrorDetect = false; break;
     case 0b00111100: if(linecount == 4) error = 0; isErrorDetect = false; break;
-    case 0b00011110: if(linecount == 4) error = 8; isErrorDetect = false; break;
-//    case 0b00001111: if(linecount == 4) error = 16; isErrorDetect = false; break;
+    case 0b00011110: if(linecount == 4) error = 24; isErrorDetect = false; break;
+//    case 0b00001111: if(linecount == 4) error = 28; isErrorDetect = false; break;
 
     // garis di semua line
     case 0b11111111:
