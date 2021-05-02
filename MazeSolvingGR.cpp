@@ -54,11 +54,8 @@ unsigned long startTime = millis(); // timer untuk menyimpan waktu pertama kali 
 unsigned long errorStart = millis(); // timer untuk menghitung waktu tidak mendeteksi garis
 unsigned long tButton = millis(); // timer untuk mendeteksi pemencetan tombol
 
-// maze controller
-#define defaultKp 2
-#define defaultKd 10
-float Kp = defaultKp;
-float Kd = defaultKd;
+float Kp = 1;
+float Kd = 10;
 float dError = 0;
 // maze pwm offset
 uint8_t leftMotorStartPwmF = 0;
@@ -940,8 +937,8 @@ void controller(float customKp, float customKd){
   if(isModeCount) return;
   ++nFunc;
 
-  Kp = constrain(customKp, -1.0, 10.0);
-  Kd = constrain(customKd, -1.0, 10.0);
+  Kp = constrain(customKp, 0.0, 100.0);
+  Kd = constrain(customKd, 0.0, 100.0);
   
   if(debug != no_debug){
     char p1[9] = {0};
@@ -952,9 +949,6 @@ void controller(float customKp, float customKd){
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
-
-  if(Kp == -1.0) Kp = defaultKp;
-  if(Kd == -1.0) Kd = defaultKd;
 }
 // sudah
 void ffspeed(uint8_t l, uint8_t r){
