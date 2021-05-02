@@ -45,7 +45,6 @@ int8_t debug = 0; // flag untuk pilihan mode debug
 #define by_func 1
 #define by_step 2
 
-uint8_t linecount = 2; // flag untuk mengatur lebar sensor
 // maze timer
 uint16_t errorTime = 500; // flag untuk mengatur lamanya robot menuju error saat tidak mendeteksi garis
 uint16_t pcTime = 100; // flag untuk timer percabangan
@@ -407,22 +406,19 @@ void controllerRun(uint8_t line, int8_t speed, bool useError = true){
     case 0b11000100: error = 5; isErrorDetect = false; break;
 
     // garis 3 sensor
-    case 0b11100000: if(linecount >= 3) error = -14; isErrorDetect = false; break;
-    case 0b01110000: if(linecount >= 3) error = -7; isErrorDetect = false; break;
-    case 0b00111000: if(linecount >= 3) error = -1; isErrorDetect = false; break;
-    case 0b00011100: if(linecount >= 3) error = 1; isErrorDetect = false; break;
-    case 0b00001110: if(linecount >= 3) error = 7; isErrorDetect = false; break;
-    case 0b00000111: if(linecount >= 3) error = 14; isErrorDetect = false; break;
+    case 0b11100000: error = -14; isErrorDetect = false; break;
+    case 0b01110000: error = -7; isErrorDetect = false; break;
+    case 0b00111000: error = -1; isErrorDetect = false; break;
+    case 0b00011100: error = 1; isErrorDetect = false; break;
+    case 0b00001110: error = 7; isErrorDetect = false; break;
+    case 0b00000111: error = 14; isErrorDetect = false; break;
 
     // garis 4 sensor 
-    case 0b11110000: if(linecount == 4) error = -8; isErrorDetect = false; break;
-    case 0b01111000: if(linecount == 4) error = -28; isErrorDetect = false; break;
-    case 0b00011110: if(linecount == 4) error = 24; isErrorDetect = false; break;
-    case 0b00001111: if(linecount == 4) error = 28; isErrorDetect = false; break;
+    case 0b11110000: error = -8; isErrorDetect = false; break;
+    case 0b00001111: error = 28; isErrorDetect = false; break;
 
     // garis di semua line
-    case 0b11111111:
-    case 0b01111110: error = 0; isErrorDetect = false; break;
+    case 0b11111111: error = 0; isErrorDetect = false; break;
 
     case 0b00000000: 
     error = 0;
@@ -977,20 +973,6 @@ void bbspeed(uint8_t l, uint8_t r){
 
   leftMotorStartPwmB = l;
   rightMotorStartPwmB = r;
-}
-// sudah
-void linetrack(uint8_t l){
-  if(isModeCount) return;
-  ++nFunc;
-  
-  if(debug != no_debug){
-    sprintf(d,getText(47).c_str(),nFunc,l);
-    logPrint(d);
-  }
-  if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
-
-  l = constrain(l,2,4);
-  linecount = l;
 }
 // sudah
 void motor(int8_t leftSpeed, int8_t rightSpeed, uint16_t runTime = 0){

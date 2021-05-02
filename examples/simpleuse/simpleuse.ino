@@ -5,7 +5,6 @@ void initMazeRobot(){ // fungsi untuk inisialisasi
   error(1,200); // gunakan fungsi error agar saat robot keluar jalur lebih dari 200ms, robot akan berhenti
   
   // fungsi dibawah ini bisa diatur di dalam mode1,mode2 atau mode3
-  linetrack(2); // atur lebar line ke 2 sensor
   sensor(ff); // gunakan sensor depan
   linecolor(black); // atur robot untuk memulai dengan garis berwarna hitam
   pid1(); // kp dan kd default untuk sensor garis (tersedia pid1() ~ pid7() ) gunakan perintah controller(kp, kd) untuk custom sendiri

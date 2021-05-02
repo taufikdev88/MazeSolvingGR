@@ -78,7 +78,6 @@ void controller(float customKp, float customKd);
 #define pid5() controller(2.0,40.0);
 #define pid6() controller(2.0,60.0);
 #define pid7() controller(3.0,30.0);
-void linetrack(uint8_t l);
 void step();
 void setstepdelay(uint16_t time);
 
