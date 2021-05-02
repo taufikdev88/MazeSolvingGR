@@ -56,12 +56,9 @@ unsigned long tButton = millis(); // timer untuk mendeteksi pemencetan tombol
 
 // maze controller
 #define defaultKp 2
-#define defaultKi 0.01
-#define defaultKd 0.5
+#define defaultKd 10
 float Kp = defaultKp;
-float Ki = defaultKi;
 float Kd = defaultKd;
-float iError = 0;
 float dError = 0;
 // maze pwm offset
 uint8_t leftMotorStartPwmF = 0;
@@ -88,7 +85,7 @@ void readSensor(bool wichSensor){
   unsigned long timewait = millis();
   for(uint8_t i=0; i<10; i++){
     while(!os->available()){
-      if((unsigned long) millis()-timewait > 50) break;
+      if((unsigned long) millis()-timewait > 10) break;
     };
 
     char in = os->read();
@@ -106,7 +103,7 @@ void readSensor(bool wichSensor){
       isSuccess = true;
     }
   }
-
+  // jika pembacaan timeout, set senData ke 0 semua
   if(!isSuccess){
     for(uint8_t i=0; i<8; i++){
       senData[i] = 0;
@@ -238,26 +235,6 @@ void printDisplayHome(String text){
   display.println(text);
   display.display();
 }
-// fungsi untuk tampilan saat user memasuki mode setting tampilan 1
-void displayConfig1(){
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(getText(1));
-  display.println(getText(2));
-  display.println(getText(3));
-  display.println(getText(4));
-  display.display();
-}
-// fungsi untuk tampilan saat user memasuki mode setting tampilan 2
-void displayConfig2(){
-  display.clearDisplay();
-  display.setCursor(0,0);
-  display.println(getText(5));
-  display.println(getText(6));
-  display.println(getText(7));
-  display.println(getText(8));
-  display.display();
-}
 // fungsi merubah array senData ke penampung berupa uint8_t agar mudah untuk pengolahan nilai sensor dalam bentuk biner
 void senData2Bin(uint8_t *line){
   if(senData[0]) *line = *line | 0b10000000;
@@ -360,38 +337,38 @@ void controllerRun(uint8_t line, int8_t speed, bool useError = true){
   
   switch(line){
     // garis 2 sensor
-//    case 0b10000000: error = -14; isErrorDetect = false; break;
-//    case 0b11000000: error = -12; isErrorDetect = false; break;
-    case 0b01000000: error = -10; isErrorDetect = false; break;
-    case 0b01100000: error = -8; isErrorDetect = false; break;
-    case 0b00100000: error = -6; isErrorDetect = false; break;
-    case 0b00110000: error = -4; isErrorDetect = false; break;
+//    case 0b10000000: error = -28; isErrorDetect = false; break;
+//    case 0b11000000: error = -24; isErrorDetect = false; break;
+    case 0b01000000: error = -20; isErrorDetect = false; break;
+    case 0b01100000: error = -16; isErrorDetect = false; break;
+    case 0b00100000: error = -12; isErrorDetect = false; break;
+    case 0b00110000: error = -8; isErrorDetect = false; break;
     
-    case 0b00010000: error = -2; isErrorDetect = false; break;
-    case 0b00001000: error = 2; isErrorDetect = false; break;
+    case 0b00010000: error = -4; isErrorDetect = false; break;
+    case 0b00001000: error = 4; isErrorDetect = false; break;
     case 0b00011000: error = 0; isErrorDetect = false; break;
 
-    case 0b00001100: error = 4; isErrorDetect = false; break;
-    case 0b00000100: error = 6; isErrorDetect = false; break;
-    case 0b00000110: error = 8; isErrorDetect = false; break;
-    case 0b00000010: error = 10; isErrorDetect = false; break;
-//    case 0b00000011: error = 12; isErrorDetect = false; break;
-//    case 0b00000001: error = 14; isErrorDetect = false; break;
+    case 0b00001100: error = 8; isErrorDetect = false; break;
+    case 0b00000100: error = 12; isErrorDetect = false; break;
+    case 0b00000110: error = 16; isErrorDetect = false; break;
+    case 0b00000010: error = 20; isErrorDetect = false; break;
+//    case 0b00000011: error = 24; isErrorDetect = false; break;
+//    case 0b00000001: error = 28; isErrorDetect = false; break;
 
     // garis 3 sensor
 //    case 0b11100000: if(linecount >= 3) error = -8; isErrorDetect = false; break;
-    case 0b01110000: if(linecount >= 3) error = -6; isErrorDetect = false; break;
-    case 0b00111000: if(linecount >= 3) error = -2; isErrorDetect = false; break;
-    case 0b00011100: if(linecount >= 3) error = 2; isErrorDetect = false; break;
-    case 0b00001110: if(linecount >= 3) error = 6; isErrorDetect = false; break;
-//    case 0b00000111: if(linecount >= 3) error = 8; isErrorDetect = false; break;
+    case 0b01110000: if(linecount >= 3) error = -12; isErrorDetect = false; break;
+    case 0b00111000: if(linecount >= 3) error = -4; isErrorDetect = false; break;
+    case 0b00011100: if(linecount >= 3) error = 4; isErrorDetect = false; break;
+    case 0b00001110: if(linecount >= 3) error = 12; isErrorDetect = false; break;
+//    case 0b00000111: if(linecount >= 3) error = 16; isErrorDetect = false; break;
 
     // garis 4 sensor 
 //    case 0b11110000: if(linecount == 4) error = -8; isErrorDetect = false; break;
-    case 0b01111000: if(linecount == 4) error = -4; isErrorDetect = false; break;
+    case 0b01111000: if(linecount == 4) error = -8; isErrorDetect = false; break;
     case 0b00111100: if(linecount == 4) error = 0; isErrorDetect = false; break;
-    case 0b00011110: if(linecount == 4) error = 4; isErrorDetect = false; break;
-//    case 0b00001111: if(linecount == 4) error = 8; isErrorDetect = false; break;
+    case 0b00011110: if(linecount == 4) error = 8; isErrorDetect = false; break;
+//    case 0b00001111: if(linecount == 4) error = 16; isErrorDetect = false; break;
 
     // garis di semua line
     case 0b11111111:
@@ -411,10 +388,8 @@ void controllerRun(uint8_t line, int8_t speed, bool useError = true){
     errorRaised();
   }
 
-  pwm = Kp*error + Ki*iError + Kd*(error-dError);
+  pwm = Kp*error + Kd*(error-dError);
   dError = error;
-  iError += error;
-  iError = constrain(iError, -500, 500);
 
   int8_t s1 = speed+pwm;
   int8_t s2 = speed-pwm;
@@ -768,111 +743,6 @@ void turn(bool dir, uint8_t sensor, uint8_t speed, uint8_t backBrakeTime){
     digitalWrite(LED_BUILTIN, 0); 
   }
 }
-// fungsi untuk mengetes/melihat nilai logika sensor saat dalam mode setting
-void testSensor(bool wichSensor){
-  HardwareSerial* os;
-  
-  if(wichSensor == ff) os = &fsensor;
-  else os = &bsensor;
-
-  unsigned long timeStart = millis();
-  os->write('T');
-  while(!os->available()){
-    if((unsigned long) millis()-timeStart >= 200){
-      printDisplayHome(getText(18));
-      delay(3000);
-      return;
-    }
-  }
-  
-  while(digitalRead(btnGo)){
-    readSensor(wichSensor);
-
-    sprintf(d,getText(75).c_str(),senData[0],senData[1],senData[2],senData[3],senData[4],senData[5],senData[6],senData[7]);
-    printDisplayHome(d);
-
-    delay(10);
-  }
-}
-// fungsi untuk menyuruh sensor untuk menyimpan nilai yang sudah sesuai ke eeprom masing masing
-void saveSensor(bool wichSensor){
-  HardwareSerial* os;
-  if(wichSensor == ff) os = &fsensor;
-  else os = &bsensor;
-  unsigned long timeStart = millis();
-  os->write('T');
-  while(!os->available()){
-    if((unsigned long) millis()-timeStart >= 200){
-      printDisplayHome(getText(18));
-      delay(3000);
-      return;
-    }
-  }
-  char C = os->read();
-  if(!isDigit(C)){
-    printDisplayHome(getText(19));
-    delay(3000);
-    return;
-  }
-  os->write('S');
-  timeStart = millis();
-  while(!os->available()){
-    if((unsigned long) millis()-timeStart >= 200){
-      printDisplayHome(getText(18));
-      delay(3000);
-      return;
-    }
-  }
-  C = os->read();
-  if(C == 'D'){
-    printDisplayHome(getText(20));
-  } else {
-    printDisplayHome(getText(21));
-  }
-  delay(3000);  
-}
-// fungsi untuk menyuruh sensor melakukan prosedur kalibrasi
-void calibSensor(bool wichSensor){
-  HardwareSerial* os;
-  if(wichSensor == ff) os = &fsensor;
-  else os = &bsensor;
-  unsigned long timeStart = millis();
-  os->write('T');
-  while(!os->available()){
-    if((unsigned long) millis()-timeStart >= 200){
-      printDisplayHome(getText(18));
-      delay(3000);
-      return;
-    }
-  }
-  char C = os->read();
-  if(!isDigit(C)) {
-    printDisplayHome(getText(19));
-    delay(3000);
-    return;
-  }
-  os->write('C');
-  timeStart = millis();
-  while(!os->available()){
-    if((unsigned long) millis()-timeStart >= 12000){
-      printDisplayHome(getText(22));
-      delay(3000);
-      return;
-    }
-
-    int timeSpent = ((unsigned long) millis()-timeStart) / 1000;
-    sprintf(d,getText(76).c_str(), timeSpent);
-    printDisplayHome(d);
-
-    delay(900);
-  }
-  if(os->read() == 'D'){
-    printDisplayHome(getText(23));
-  } else {
-    printDisplayHome(getText(24));
-  }
-  delay(3000);
-}
 /****************************** Batas fungsi yang tidak ditampilkan ke pengguna ***************************/
 
 /****************************** Fungsi yang bisa dijalankan oleh pengguna *********************************/
@@ -1013,28 +883,24 @@ void error(bool useError, uint16_t time){
   errorTime = time;
 }
 // sudah
-void controller(float customKp, float customKi, float customKd){
+void controller(float customKp, float customKd){
   if(isModeCount) return;
   ++nFunc;
 
   Kp = constrain(customKp, -1.0, 10.0);
-  Ki = constrain(customKi, -1.0, 10.0);
   Kd = constrain(customKd, -1.0, 10.0);
   
   if(debug != no_debug){
     char p1[9] = {0};
     char p2[9] = {0};
-    char p3[9] = {0};
     dtostrf(customKp,2,5,p1);
-    dtostrf(customKi,2,5,p2);
-    dtostrf(customKd,2,5,p3);
-    sprintf(d,getText(44).c_str(),nFunc,p1,p2,p3);
+    dtostrf(customKd,2,5,p2);
+    sprintf(d,getText(44).c_str(),nFunc,p1,p2);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
 
   if(Kp == -1.0) Kp = defaultKp;
-  if(Ki == -1.0) Ki = defaultKi;
   if(Kd == -1.0) Kd = defaultKd;
 }
 // sudah
@@ -1636,123 +1502,15 @@ void setup(){
   getLastMode();
   unsigned long tLcd = millis();
   countSetpoint();
-
-  while(true){ // standby menu 1
+  // standby menu 1
+  while(true){ 
     if(isBtnGo() && (unsigned long) millis()-tButton >= DELAY_BUTTON){ // jika button go dipencet
       digitalWrite(buzz, 1);
       tButton = millis();
-      while(isBtnGo()){ // cek dulu berapa lamanya untuk membedakan masuk mode setting atau mode run
-        if((unsigned long) millis()-tButton > 1000) break;
-      };
-
-      if((unsigned long) millis()-tButton < 1000){
-        delay(DELAY_BUZZER);
-        digitalWrite(buzz, 0);
-        break; // jika mencet go cepet, maka next
-      } else {
-        displayConfig1();
-        while(isBtnGo());
-
-        digitalWrite(buzz, 0);
-        tButton = millis();
-
-        uint8_t menu1 = 0;
-        bool stepMenu = 0;
-        bool stillConfig = true; // flag masih dalam mode config
-
-        while(stillConfig){
-          switch (stepMenu){
-            case 0:
-              if(isBtn1() && (unsigned long) millis()-tButton >= DELAY_BUTTON){
-                digitalWrite(buzz, 1);
-                tButton = millis();
-                menu1 = 1;
-                stepMenu = 1;
-                delay(DELAY_BUZZER);
-              }
-              if(isBtn2() && (unsigned long) millis()-tButton >= DELAY_BUTTON){
-                digitalWrite(buzz, 1);
-                menu1 = 2;
-                stepMenu = 1;
-                tButton = millis();
-                delay(DELAY_BUZZER);
-              }
-              if(isBtn3() && (unsigned long) millis()-tButton >= DELAY_BUTTON){
-                digitalWrite(buzz, 1);
-                menu1 = 3;
-                stepMenu = 1;
-                tButton = millis();
-                delay(DELAY_BUZZER);
-              }
-
-              if(isBtn4() && (unsigned long) millis()-tButton >= DELAY_BUTTON){
-                digitalWrite(buzz, 1);
-                tButton = millis();
-                stillConfig = false;
-                delay(DELAY_BUZZER);
-              }
-              break;
-            case 1:
-              if(isBtn1() && (unsigned long) millis()-tButton >= DELAY_BUTTON){
-                digitalWrite(buzz, 1);
-                tButton = millis();
-                delay(DELAY_BUZZER);
-                digitalWrite(buzz, 0);
-                switch (menu1)
-                {
-                case 1:
-                  calibSensor(ff);
-                  break;
-                case 2:
-                  testSensor(ff);
-                  break;
-                case 3:
-                  saveSensor(ff);
-                  break;
-                default:
-                  break;
-                }
-              }
-              if(isBtn2() && (unsigned long) millis()-tButton >= DELAY_BUTTON){
-                digitalWrite(buzz, 1);
-                tButton = millis();
-                delay(DELAY_BUZZER);
-                digitalWrite(buzz, 0);
-                switch (menu1)
-                {
-                case 1:
-                  calibSensor(bb);
-                  break;
-                case 2:
-                  testSensor(bb);
-                  break;
-                case 3:
-                  saveSensor(bb);
-                  break;
-                default:
-                  break;
-                }
-              }
-
-              if(isBtn4() && (unsigned long) millis()-tButton >= DELAY_BUTTON){
-                digitalWrite(buzz, 1);
-                tButton = millis();
-                stepMenu = 0;
-                delay(DELAY_BUZZER);
-              }
-              break;
-            default: stepMenu = 0; break;
-          }
-          
-          digitalWrite(buzz,0);
-          if((unsigned long) millis()-tLcd >= DELAY_BUTTON){
-            tLcd = millis();
-            if(stepMenu == 0) displayConfig1(); else displayConfig2();
-          }
-        }
-      }
+      delay(DELAY_BUZZER);
+      digitalWrite(buzz, 0);
+      break; // jika mencet go cepet, maka next
     }
-
     if(isBtnStep() && (unsigned long) millis()-tButton >= DELAY_BUTTON){
       digitalWrite(buzz, 1);
       tButton = millis();
@@ -1794,7 +1552,6 @@ void setup(){
   }
   display.println();
   display.println();
-  // display.println(getText(29));
   display.println(getText(30));
   display.display();
   while(1){

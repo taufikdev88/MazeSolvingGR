@@ -70,7 +70,7 @@ void pctimer(uint16_t pc);
 void linecolor(bool color);
 void sensor(bool dir);
 void error(bool useError, uint16_t time);
-void controller(float customKp, float customKi, float customKd);
+void controller(float customKp, float customKd);
 void linetrack(uint8_t l);
 void step();
 void setstepdelay(uint16_t time);

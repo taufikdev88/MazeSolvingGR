@@ -8,7 +8,7 @@ void initMazeRobot(){ // fungsi untuk inisialisasi
   linetrack(2); // atur lebar line ke 2 sensor
   sensor(ff); // gunakan sensor depan
   linecolor(black); // atur robot untuk memulai dengan garis berwarna hitam
-  controller(-1,-1,-1); // kp, ki dan kd default untuk sensor garis
+  controller(-1,-1); // kp, ki dan kd default untuk sensor garis
 }
 
 void mode1(){

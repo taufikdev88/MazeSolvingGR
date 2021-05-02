@@ -14,7 +14,7 @@ String getText(uint8_t i){
     file.close();
   }
   return temp;
-}
+} 
 // fungsi untuk tampilan saat user memasuki mode setting tampilan 1
 void displayConfig1(){
   display.clearDisplay();
