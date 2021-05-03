@@ -1,4 +1,6 @@
 #include "MazeSolvingGR.h"
+
+#ifdef MAZESOLVINGGR_H_
 /*
  * Pin declaration
  */
@@ -1515,7 +1517,7 @@ void setup(){
   digitalWrite(buzz, 0);
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
-  delay(100);
+  delay(10);
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
@@ -1583,13 +1585,7 @@ void setup(){
   display.println();
   display.println(getText(30));
   display.display();
-  while(1){
-    if(isBtnGo() && (unsigned long) millis()-tButton >= DELAY_BUTTON){ 
-      // isMirror = false; 
-      break; 
-    }
-    // if(isBtnDebug() && (unsigned long) millis()-tButton >= DELAY_BUTTON){ isMirror = true; break; }
-  }
+  while(1){ if(isBtnGo() && (unsigned long) millis()-tButton >= DELAY_BUTTON) break; }
 
   logPrint(F("run"));
   
@@ -1614,3 +1610,5 @@ void setup(){
 void loop(){ 
 
 }
+
+#endif
