@@ -1,6 +1,5 @@
 #include "MazeSolvingGR.h"
 
-#ifdef MAZESOLVINGGR_H_
 /*
  * Pin declaration
  */
@@ -356,9 +355,22 @@ void controllerRun(uint8_t line, int8_t speed, bool useError = true){
     case 0b00000010: error = 16; isErrorDetect = false; break;
     case 0b00000011: error = 19; isErrorDetect = false; break;
     case 0b00000001: error = 21; isErrorDetect = false; break;
+    
+    // garis 3 sensor
+    case 0b11100000: error = -14; isErrorDetect = false; break;
+    case 0b01110000: error = -7; isErrorDetect = false; break;
+    case 0b00111000: error = -1; isErrorDetect = false; break;
+    case 0b00011100: error = 1; isErrorDetect = false; break;
+    case 0b00001110: error = 7; isErrorDetect = false; break;
+    case 0b00000111: error = 14; isErrorDetect = false; break;
+
+    // garis 4 sensor 
+    case 0b11110000: error = -28; isErrorDetect = false; break;
+    case 0b00001111: error = 28; isErrorDetect = false; break;
 
     // normal 
     case 0b00011000: error = 0; isErrorDetect = false; break;
+    
     // error di sensor lain tidak begitu parah
     case 0b00011010:
     case 0b00011001:
@@ -400,24 +412,12 @@ void controllerRun(uint8_t line, int8_t speed, bool useError = true){
     case 0b11001100: error = 3; isErrorDetect = false; break;
 
     // error sensor kondisi samping high
-    case 0b00100010:
-    case 0b00100001:
-    case 0b00100011: error = -5; isErrorDetect = false; break;
-    case 0b01000100:
-    case 0b10000100:
-    case 0b11000100: error = 5; isErrorDetect = false; break;
-
-    // garis 3 sensor
-    case 0b11100000: error = -14; isErrorDetect = false; break;
-    case 0b01110000: error = -7; isErrorDetect = false; break;
-    case 0b00111000: error = -1; isErrorDetect = false; break;
-    case 0b00011100: error = 1; isErrorDetect = false; break;
-    case 0b00001110: error = 7; isErrorDetect = false; break;
-    case 0b00000111: error = 14; isErrorDetect = false; break;
-
-    // garis 4 sensor 
-    case 0b11110000: error = -8; isErrorDetect = false; break;
-    case 0b00001111: error = 28; isErrorDetect = false; break;
+    // case 0b00100010:
+    // case 0b00100001:
+    // case 0b00100011: error = -5; isErrorDetect = false; break;
+    // case 0b01000100:
+    // case 0b10000100:
+    // case 0b11000100: error = 5; isErrorDetect = false; break;
 
     // garis di semua line
     case 0b11111111: error = 0; isErrorDetect = false; break;
@@ -1607,8 +1607,5 @@ void setup(){
   logPrint(d);
 }
 
-void loop(){ 
-
+void loop(){
 }
-
-#endif
