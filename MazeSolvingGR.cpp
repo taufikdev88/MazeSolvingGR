@@ -17,6 +17,7 @@
  */
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
+HardwareTimer pwmtimer(4);
 /*
  * Global variable
  */
@@ -244,33 +245,30 @@ void senData2Bin(uint8_t *line){
   if(senData[7]) *line = *line | 0b00000001;
 }
 // fungsi untuk menjalankan motor kanan kiri berdasarkan skala pwm speed 0-20 
+#define PWM_RESOLUTION 3600
 void kinematik(int8_t leftSpeed, int8_t rightSpeed){
   float fSpeed = 0.0;
   if(leftSpeed < 0){
-    // mundur
     fSpeed = (float) leftSpeed / -20.0;
-    fSpeed = constrain(((fSpeed * 255.0) + leftMotorStartPwmB), 0, 255);
-    analogWrite(pwm1, fSpeed );
-    analogWrite(pwm2, 0);
+    fSpeed = constrain(((fSpeed * PWM_RESOLUTION) + leftMotorStartPwmB), 0, PWM_RESOLUTION);
+    pwmWrite(pwm1, fSpeed);
+    pwmWrite(pwm2, 0);
   } else {
-    // maju
     fSpeed = (float) leftSpeed / 20.0;
-    fSpeed = constrain(((fSpeed * 255.0) + leftMotorStartPwmF), 0, 255);
-    analogWrite(pwm1, 0);
-    analogWrite(pwm2, fSpeed);
+    fSpeed = constrain(((fSpeed * PWM_RESOLUTION) + leftMotorStartPwmF), 0, PWM_RESOLUTION);
+    pwmWrite(pwm1, 0);
+    pwmWrite(pwm2, fSpeed);
   }
   if(rightSpeed < 0){
-    // mundur
     fSpeed = (float) rightSpeed / -20.0;
-    fSpeed = constrain(((fSpeed * 255.0) + rightMotorStartPwmB), 0, 255);  
-    analogWrite(pwm3, fSpeed);
-    analogWrite(pwm4, 0);
+    fSpeed = constrain(((fSpeed * PWM_RESOLUTION) + rightMotorStartPwmB), 0, PWM_RESOLUTION);
+    pwmWrite(pwm3, fSpeed);
+    pwmWrite(pwm4, 0);
   } else {
-    // maju
     fSpeed = (float) rightSpeed / 20.0;
-    fSpeed = constrain(((fSpeed * 255.0) + rightMotorStartPwmF), 0, 255);
-    analogWrite(pwm3, 0);
-    analogWrite(pwm4, fSpeed);
+    fSpeed = constrain(((fSpeed * PWM_RESOLUTION) + rightMotorStartPwmF), 0, PWM_RESOLUTION);
+    pwmWrite(pwm3, 0);
+    pwmWrite(pwm4, fSpeed);
   }
 }
 void motor_f(int8_t leftSpeed, int8_t rightSpeed, uint16_t runTime = 0){
@@ -1503,10 +1501,11 @@ void lostline(uint16_t lostLineTime, uint8_t speed, uint16_t runTime, int16_t ba
 void setup(){
   bsensor.begin(115200);
   fsensor.begin(115200);
-  pinMode(pwm1, OUTPUT);
-  pinMode(pwm2, OUTPUT);
-  pinMode(pwm3, OUTPUT);
-  pinMode(pwm4, OUTPUT);
+  pwmtimer.setPeriod(50);
+  pinMode(pwm1, PWM);
+  pinMode(pwm2, PWM);
+  pinMode(pwm3, PWM);
+  pinMode(pwm4, PWM);
   pinMode(buzz, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(btnMode, INPUT_PULLUP);
