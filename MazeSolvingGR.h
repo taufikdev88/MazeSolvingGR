@@ -1,5 +1,8 @@
 #ifndef MAZESOLVINGGR_H_
 #define MAZESOLVINGGR_H_
+
+#define ROBOT_NEW
+
 /*
  * Dependencies library
  */

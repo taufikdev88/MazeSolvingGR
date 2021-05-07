@@ -3,10 +3,18 @@
 /*
  * Pin declaration
  */
-#define pwm1 PB8
-#define pwm2 PB9
-#define pwm3 PB6
-#define pwm4 PB7
+#ifndef ROBOT_NEW
+  #define pwm1 PB8
+  #define pwm2 PB9
+  #define pwm3 PB6
+  #define pwm4 PB7
+#else
+  #define pwm1 PB0
+  #define pwm2 PB1
+  #define pwm3 PB8
+  #define pwm4 PB9
+#endif
+
 #define buzz PA8
 #define btnMode PA15
 #define btnStep PB3
@@ -18,6 +26,9 @@
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
 HardwareTimer pwmtimer(4);
+#ifdef ROBOT_NEW
+HardwareTimer pwmtimer2(3);
+#endif
 /*
  * Global variable
  */
@@ -71,6 +82,35 @@ String mazeLog[2]; // variable untuk log terakhir saat menjalankan mode debuggin
 // **************************************************************************************************
 
 /************************************* fungsi yang tidak di tampilkan ke pengguna *******************/
+#ifdef ROBOT_NEW
+volatile uint32_t counterL = 0;
+volatile uint32_t counterR = 0;
+unsigned long lastTimeL = 0;
+unsigned long lastTimeR = 0;
+void pulseCountL(){
+  counterL++;
+}
+void pulseCountR(){
+  counterR++;
+}
+int getRPML(){
+  detachInterrupt(digitalPinToInterrupt(PA1));
+  int rpm = 60*1000 / (millis()-lastTimeL)*counterL;
+  lastTimeL = millis();
+  counterL = 0;
+  attachInterrupt(digitalPinToInterrupt(PA1),pulseCountL,RISING);
+  return rpm;
+}
+int getRPMR(){
+  detachInterrupt(digitalPinToInterrupt(PA8));
+  int rpm = 60*1000 / (millis()-lastTimeR)*counterR;
+  lastTimeR = millis();
+  counterR = 0;
+  attachInterrupt(digitalPinToInterrupt(PA8),pulseCountR,RISING);
+  return rpm;
+}
+#endif
+
 // ----------------------- fungsi independen / tidak bergantung ke fungsi yang lain -- posisi atas
 // fungsi pembacaan nilai dari sensor depan dan belakang termasuk dengan parsing dan menyimpan ke variable senData
 void readSensor(bool wichSensor){
@@ -304,6 +344,9 @@ void displayMenu(){
     default: debug = 0; break;
   }
   display.println(getText(16));
+  sprintf(d,"rpm_l:%d r:%d", getRPML(), getRPMR());
+  display.println(d);
+
   display.setCursor(0,48);
   readSensor(ff);
   sprintf(d,getText(73).c_str(), senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7]);
@@ -1514,6 +1557,15 @@ void setup(){
   pinMode(btnGo, INPUT_PULLUP);
   digitalWrite(LED_BUILTIN, 0);
   digitalWrite(buzz, 0);
+  
+  #ifdef ROBOT_NEW
+  pinMode(PA1, INPUT);
+  pinMode(PA8, INPUT);
+  attachInterrupt(digitalPinToInterrupt(PA1), pulseCountL, RISING);
+  attachInterrupt(digitalPinToInterrupt(PA8), pulseCountR, RISING);
+  pwmtimer2.setPeriod(50);
+  #endif
+
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
   delay(10);
