@@ -344,7 +344,7 @@ void displayMenu(){
     default: debug = 0; break;
   }
   display.println(getText(16));
-  sprintf(d,"rpm_l:%d r:%d", getRPML(), getRPMR());
+  sprintf(d,"rpm_l:%d r:%d", counterL, counterR);
   display.println(d);
 
   display.setCursor(0,48);
