@@ -1,0 +1,1 @@
+%d. linetline(%d,%d,%d,%d,%d,%d);

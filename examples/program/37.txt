@@ -1,0 +1,1 @@
+ %d. linecolor(%s);
