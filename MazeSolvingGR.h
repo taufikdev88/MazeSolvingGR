@@ -40,14 +40,16 @@
 #define sl 7 // robot stop upon sensing cross line on the left
 #define sr 8 // robot stop upon sensing cross line on the right
 // sensor define
-#define sensor1 128
-#define sensor2 64
-#define sensor3 32
-#define sensor4 16
-#define sensor5 8
-#define sensor6 4
-#define sensor7 2
-#define sensor8 1
+#define sensor1 512
+#define sensor2 256
+#define sensor3 128
+#define sensor4 64
+#define sensor5 32
+#define sensor6 16
+#define sensor7 8
+#define sensor8 4
+#define sensor9 2
+#define sensor10 1
 
 /*
  * Defined function
@@ -98,8 +100,12 @@ void left2(uint8_t speed, uint8_t backBrakeTime);
 void left3(uint8_t speed, uint8_t backBrakeTime);
 void left4(uint8_t speed, uint8_t backBrakeTime);
 void left5(uint8_t speed, uint8_t backBrakeTime);
+void left6(uint8_t speed, uint8_t backBrakeTime);
+void left7(uint8_t speed, uint8_t backBrakeTime);
 
 void right(uint8_t speed, uint8_t backBrakeTime);
+void right10(uint8_t speed, uint8_t backBrakeTime);
+void right9(uint8_t speed, uint8_t backBrakeTime);
 void right8(uint8_t speed, uint8_t backBrakeTime);
 void right7(uint8_t speed, uint8_t backBrakeTime);
 void right6(uint8_t speed, uint8_t backBrakeTime);

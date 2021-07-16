@@ -3,17 +3,10 @@
 /*
  * Pin declaration
  */
-#ifndef ROBOT_NEW
-  #define pwm1 PB8
-  #define pwm2 PB9
-  #define pwm3 PB6
-  #define pwm4 PB7
-#else
-  #define pwm1 PB0
-  #define pwm2 PB1
-  #define pwm3 PB8
-  #define pwm4 PB9
-#endif
+#define pwm1 PB0
+#define pwm2 PB1
+#define pwm3 PB8
+#define pwm4 PB9
 
 #define buzz PA8
 #define btnMode PA15
@@ -26,17 +19,15 @@
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
 HardwareTimer pwmtimer(4);
-#ifdef ROBOT_NEW
 HardwareTimer pwmtimer2(3);
-#endif
 /*
  * Global variable
  */
 #define DELAY_BUZZER 50
 #define DELAY_BUTTON 200
 // sensor 
-#define fsensor Serial2
-#define bsensor Serial1
+#define fsensor Serial1
+#define bsensor Serial2
 // sensor detection side
 #define none -1
 #define leftSide 0
@@ -75,14 +66,13 @@ uint8_t rightMotorStartPwmF = 0;
 uint8_t leftMotorStartPwmB = 0;
 uint8_t rightMotorStartPwmB = 0;
 // maze data
-bool senData[8] = {0}; // menyimpan nilai sensor
+bool senData[10] = {0}; // menyimpan nilai sensor
 char d[50] = {0}; // variable untuk digunakan bersama untuk sprint log
 String mazeLog[2]; // variable untuk log terakhir saat menjalankan mode debugging
 
 // **************************************************************************************************
 
 /************************************* fungsi yang tidak di tampilkan ke pengguna *******************/
-#ifdef ROBOT_NEW
 volatile uint32_t counterL = 0;
 volatile uint32_t counterR = 0;
 unsigned long lastTimeL = 0;
@@ -94,34 +84,33 @@ void pulseCountR(){
   counterR++;
 }
 int getRPML(){
-  detachInterrupt(digitalPinToInterrupt(PA1));
+  detachInterrupt(digitalPinToInterrupt(PA0));
   int rpm = 60*1000 / (millis()-lastTimeL)*counterL;
   lastTimeL = millis();
   counterL = 0;
-  attachInterrupt(digitalPinToInterrupt(PA1),pulseCountL,RISING);
+  attachInterrupt(digitalPinToInterrupt(PA0),pulseCountL,RISING);
   return rpm;
 }
 int getRPMR(){
-  detachInterrupt(digitalPinToInterrupt(PA8));
+  detachInterrupt(digitalPinToInterrupt(PA1));
   int rpm = 60*1000 / (millis()-lastTimeR)*counterR;
   lastTimeR = millis();
   counterR = 0;
-  attachInterrupt(digitalPinToInterrupt(PA8),pulseCountR,RISING);
+  attachInterrupt(digitalPinToInterrupt(PA1),pulseCountR,RISING);
   return rpm;
 }
-#endif
 
 // ----------------------- fungsi independen / tidak bergantung ke fungsi yang lain -- posisi atas
 // fungsi pembacaan nilai dari sensor depan dan belakang termasuk dengan parsing dan menyimpan ke variable senData
 void readSensor(bool wichSensor){
   HardwareSerial* os;
-  bool temp[8] = { 0 };
+  bool temp[10] = { 0 };
   if(wichSensor == ff) os = &fsensor;
   else os = &bsensor;
   os->write('A');
   bool isSuccess = false;
   unsigned long timewait = millis();
-  for(uint8_t i=0; i<10; i++){
+  for(uint8_t i=0; i<12; i++){
     while(!os->available()){
       if((unsigned long) millis()-timewait > 10) break;
     };
@@ -134,7 +123,7 @@ void readSensor(bool wichSensor){
       temp[i-1] = (in == '0' ? 0 : 1);
     } else if(i == 9){
       if( in != 'T' ) break;
-      for( i =0; i<8; i++){
+      for( i =0; i<10; i++){
         senData[i] = temp[i];
       }
       i = 10; // keluar loop
@@ -143,7 +132,7 @@ void readSensor(bool wichSensor){
   }
   // jika pembacaan timeout, set senData ke 0 semua
   if(!isSuccess){
-    for(uint8_t i=0; i<8; i++){
+    for(uint8_t i=0; i<10; i++){
       senData[i] = 0;
     }
   }
@@ -274,15 +263,17 @@ void printDisplayHome(String text){
   display.display();
 }
 // fungsi merubah array senData ke penampung berupa uint8_t agar mudah untuk pengolahan nilai sensor dalam bentuk biner
-void senData2Bin(uint8_t *line){
-  if(senData[0]) *line = *line | 0b10000000;
-  if(senData[1]) *line = *line | 0b01000000;
-  if(senData[2]) *line = *line | 0b00100000;
-  if(senData[3]) *line = *line | 0b00010000;
-  if(senData[4]) *line = *line | 0b00001000;
-  if(senData[5]) *line = *line | 0b00000100;
-  if(senData[6]) *line = *line | 0b00000010;
-  if(senData[7]) *line = *line | 0b00000001;
+void senData2Bin(uint16_t *line){
+  if(senData[0]) *line = *line | 0b1000000000;
+  if(senData[1]) *line = *line | 0b0100000000;
+  if(senData[2]) *line = *line | 0b0010000000;
+  if(senData[3]) *line = *line | 0b0001000000;
+  if(senData[4]) *line = *line | 0b0000100000;
+  if(senData[5]) *line = *line | 0b0000010000;
+  if(senData[6]) *line = *line | 0b0000001000;
+  if(senData[7]) *line = *line | 0b0000000100;
+  if(senData[8]) *line = *line | 0b0000000010;
+  if(senData[9]) *line = *line | 0b0000000001;
 }
 // fungsi untuk menjalankan motor kanan kiri berdasarkan skala pwm speed 0-20 
 #define PWM_RESOLUTION 3600
@@ -365,7 +356,7 @@ void errorRaised(){
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
 
-    uint8_t line = 0;
+    uint16_t line = 0;
     senData2Bin(&line);
 
     delay(DELAY_BUZZER);
@@ -376,81 +367,106 @@ void errorRaised(){
   logPrint(F("run"));
 }
 // fungsi yang menjalankan motor sesuai PID untuk sensor garis
-void controllerRun(uint8_t line, int8_t speed, bool useError = true){
+void controllerRun(uint16_t line, int8_t speed, bool useError = true){
   int8_t error = 0;
   int8_t pwm = 0;
   
   switch(line){
     // garis 2 sensor
-    case 0b10000000: error = -21; isErrorDetect = false; break;
-    case 0b11000000: error = -19; isErrorDetect = false; break;
-    case 0b01000000: error = -16; isErrorDetect = false; break;
-    case 0b01100000: error = -12; isErrorDetect = false; break;
-    case 0b00100000: error = -10; isErrorDetect = false; break;
-    case 0b00110000: error = -5; isErrorDetect = false; break;
-    case 0b00010000: error = -2; isErrorDetect = false; break;
-    case 0b00001000: error = 2; isErrorDetect = false; break;
-    case 0b00001100: error = 5; isErrorDetect = false; break;
-    case 0b00000100: error = 10; isErrorDetect = false; break;
-    case 0b00000110: error = 12; isErrorDetect = false; break;
-    case 0b00000010: error = 16; isErrorDetect = false; break;
-    case 0b00000011: error = 19; isErrorDetect = false; break;
-    case 0b00000001: error = 21; isErrorDetect = false; break;
+    case 0b1000000000: error = -27; isErrorDetect = false; break;
+    case 0b1100000000: error = -24; isErrorDetect = false; break;
+    case 0b0100000000: error = -21; isErrorDetect = false; break;
+    case 0b0110000000: error = -19; isErrorDetect = false; break;
+    case 0b0010000000: error = -16; isErrorDetect = false; break;
+    case 0b0011000000: error = -12; isErrorDetect = false; break;
+    case 0b0001000000: error = -10; isErrorDetect = false; break;
+    case 0b0001100000: error = -5; isErrorDetect = false; break;
+    case 0b0000100000: error = -2; isErrorDetect = false; break;
+    case 0b0000010000: error = 2; isErrorDetect = false; break;
+    case 0b0000011000: error = 5; isErrorDetect = false; break;
+    case 0b0000001000: error = 10; isErrorDetect = false; break;
+    case 0b0000001100: error = 12; isErrorDetect = false; break;
+    case 0b0000000100: error = 16; isErrorDetect = false; break;
+    case 0b0000000110: error = 19; isErrorDetect = false; break;
+    case 0b0000000010: error = 21; isErrorDetect = false; break;
+    case 0b0000000011: error = 24; isErrorDetect = false; break;
+    case 0b0000000001: error = 27; isErrorDetect = false; break;
     
     // garis 3 sensor
-    case 0b11100000: error = -14; isErrorDetect = false; break;
-    case 0b01110000: error = -7; isErrorDetect = false; break;
-    case 0b00111000: error = -1; isErrorDetect = false; break;
-    case 0b00011100: error = 1; isErrorDetect = false; break;
-    case 0b00001110: error = 7; isErrorDetect = false; break;
-    case 0b00000111: error = 14; isErrorDetect = false; break;
+    case 0b1110000000: error = -21; isErrorDetect = false; break;
+    case 0b0111000000: error = -14; isErrorDetect = false; break;
+    case 0b0011100000: error = -7; isErrorDetect = false; break;
+    case 0b0001110000: error = -1; isErrorDetect = false; break;
+    case 0b0000111000: error = 1; isErrorDetect = false; break;
+    case 0b0000011100: error = 7; isErrorDetect = false; break;
+    case 0b0000001110: error = 14; isErrorDetect = false; break;
+    case 0b0000000111: error = 21; isErrorDetect = false; break;
 
-    // garis 4 sensor 
-    case 0b11110000: error = -28; isErrorDetect = false; break;
-    case 0b00001111: error = 28; isErrorDetect = false; break;
+    // garis 4 sensor
+    case 0b1111000000: error = -36; isErrorDetect = false; break; 
+    case 0b0111100000: error = -28; isErrorDetect = false; break;
+    case 0b0000011110: error = 28; isErrorDetect = false; break;
+    case 0b0000001111: error = 36; isErrorDetect = false; break;
 
     // normal 
-    case 0b00011000: error = 0; isErrorDetect = false; break;
+    case 0b0000110000: error = 0; isErrorDetect = false; break;
     
     // error di sensor lain tidak begitu parah
-    case 0b00011010:
-    case 0b00011001:
-    case 0b00011011:
-    case 0b01011000:
-    case 0b10011000:
-    case 0b11011000:
+    case 0b0000110001:
+    case 0b0000110011:
+    case 0b0000110100:
+    case 0b0000110010:
+    case 0b0000110110:
+    case 0b0010110000:
+    case 0b0100110000:
+    case 0b0110110000:
+    case 0b1100110000:
+    case 0b1000110000:
     // error di sensor lain tp parah
-    case 0b01111000:
-    case 0b00011110:
+    case 0b0011110000:
+    case 0b0000111100:
     // error tp imbang di kanan kiri sensor
-    case 0b00111100:
-    case 0b01111110:
-    case 0b10011001:
-    case 0b01011010:
-    case 0b11011011:
+    case 0b0001111000:
+    case 0b0011111100:
+    case 0b0111111110:
+    case 0b0100110010:
+    case 0b1000110001:
+    case 0b1100110011:
+    case 0b0010110100:
+    case 0b0110110110:
     // invers error tp imbang di kanan kiri sensor
-    case 0b11100111:
-    case 0b11000011:
-    case 0b10000001:
-    case 0b01100110:
-    case 0b00100100:
-    case 0b01000010: error = 0; isErrorDetect = false; break;
+    case 0b1111001111:
+    case 0b1110000111:
+    case 0b1100000011:
+    case 0b1000000001:
+    case 0b0111001110:
+    case 0b0011001100:
+    case 0b0001001000:
+    case 0b0010000100: error = 0; isErrorDetect = false; break;
     
     // error sensor kondisi tengah
-    case 0b00010010:
-    case 0b00010001:
-    case 0b00010011: error = -1; isErrorDetect = false; break;
-    case 0b01001000:
-    case 0b10001000:
-    case 0b11001000: error = 1; isErrorDetect = false; break;
+    case 0b0000100001:
+    case 0b0000100011:
+    case 0b0000100100:
+    case 0b0000100010:
+    case 0b0000100110: error = -1; isErrorDetect = false; break;
+    case 0b0010010000:
+    case 0b0100010000:
+    case 0b1100010000:
+    case 0b1000010000:
+    case 0b0110010000: error = 1; isErrorDetect = false; break;
 
     // error sensor kondisi samping medium
-    case 0b00110010:
-    case 0b00110001:
-    case 0b00110011: error = -3; isErrorDetect = false; break;
-    case 0b01001100:
-    case 0b10001100:
-    case 0b11001100: error = 3; isErrorDetect = false; break;
+    case 0b0001100001:
+    case 0b0001100011:
+    case 0b0001100100:
+    case 0b0001100010:
+    case 0b0001100110: error = -3; isErrorDetect = false; break;
+    case 0b1000011000:
+    case 0b1100011000:
+    case 0b0010011000:
+    case 0b0100011000:
+    case 0b0110011000: error = 3; isErrorDetect = false; break;
 
     // error sensor kondisi samping high
     // case 0b00100010:
@@ -461,9 +477,9 @@ void controllerRun(uint8_t line, int8_t speed, bool useError = true){
     // case 0b11000100: error = 5; isErrorDetect = false; break;
 
     // garis di semua line
-    case 0b11111111: error = 0; isErrorDetect = false; break;
+    case 0b1111111111: error = 0; isErrorDetect = false; break;
 
-    case 0b00000000: 
+    case 0b0000000000: 
     error = 0;
     if(!isErrorDetect){
       logPrint(getText(17));
@@ -502,7 +518,7 @@ void backBrakeTimeF(uint8_t speed, int16_t brakeTime){
       if(isTraceForward) readSensor(ff);
       else readSensor(bb);
 
-      uint8_t line = 0x00;
+      uint16_t line = 0x00;
       senData2Bin(&line);
 
       controllerRun(line, speed);
@@ -550,7 +566,7 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
           }
         }
       }
-      if(senData[7]){
+      if(senData[9]){
         if(!isTimeDetect){
           isTimeDetect = true;
           side = rightSide;
@@ -582,7 +598,7 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
           }
         }
       }
-      if(senData[6] && senData[7]){
+      if(senData[8] && senData[9]){
         if(!isTimeDetect){
           isTimeDetect = true;
           side = rightSide;
@@ -604,9 +620,9 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
       if(senData[0]) ++side;
       if(senData[1]) ++side;
       if(senData[2]) ++side;
-      if(senData[5]) ++side;
-      if(senData[6]) ++side;
       if(senData[7]) ++side;
+      if(senData[8]) ++side;
+      if(senData[9]) ++side;
       if(side >= 5) crossDetected = true;
       break;
       case pp3:
@@ -614,16 +630,16 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
       if(senData[0]) ++side;
       if(senData[1]) ++side;
       if(senData[2]) ++side;
-      if(senData[5]) ++side;
-      if(senData[6]) ++side;
       if(senData[7]) ++side;
+      if(senData[8]) ++side;
+      if(senData[9]) ++side;
       if(side >= 6) crossDetected = true;
       break;
       case tt1:
       if((dir == fl || dir == ll || dir == sl) && senData[0]){
         crossDetected = true;
       } else 
-      if((dir == fr || dir == rr || dir == sr) && senData[7]){
+      if((dir == fr || dir == rr || dir == sr) && senData[9]){
         crossDetected = true;
       }
       break;
@@ -631,7 +647,7 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
       if((dir == fl || dir == ll || dir == sl) && senData[0] && senData[1]){
         crossDetected = true;
       } else 
-      if((dir == fr || dir == rr || dir == sr) && senData[6] && senData[7]){
+      if((dir == fr || dir == rr || dir == sr) && senData[8] && senData[9]){
         crossDetected = true;
       }
       break;
@@ -639,14 +655,14 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
       if((dir == fl || dir == ll || dir == sl) && senData[0] && senData[1] && senData[2]){
         crossDetected = true;
       } else 
-      if((dir == fr || dir == rr || dir == sr) && senData[5] && senData[6] && senData[7]){
+      if((dir == fr || dir == rr || dir == sr) && senData[7] && senData[8] && senData[9]){
         crossDetected = true;
       }
       break;
     }
     if(crossDetected) continue;
     
-    uint8_t line = 0;
+    uint16_t line = 0;
     senData2Bin(&line);
 
     /*
@@ -686,7 +702,7 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
     case rr:
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
-    while(senData[0] || senData[7]){
+    while(senData[0] || senData[9]){
       if(isTraceForward){ 
         readSensor(ff);
         motor_f(speed,speed,0);
@@ -709,7 +725,7 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
   crossDetected = false;
   switch(dir){
     case ll:
-    while(!crossDetected || (!senData[3] && !senData[4])){
+    while(!crossDetected || (!senData[4] && !senData[5])){
       if(isTraceForward){
         motor_f(-speed,speed,0);
         readSensor(ff);
@@ -721,7 +737,7 @@ void runAndDetect(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime,
     }
     break;
     case rr:
-    while(!crossDetected || (!senData[3] && !senData[4])){
+    while(!crossDetected || (!senData[4] && !senData[5])){
       if(isTraceForward){
         motor_f(speed,-speed,0);
         readSensor(ff);
@@ -764,7 +780,7 @@ void linedelay_f(uint8_t speed, uint16_t runTime, int16_t backBrakeTime){
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
 
-    uint8_t line = 0x00;
+    uint16_t line = 0x00;
     senData2Bin(&line);
 
     controllerRun(line, speed);
@@ -1156,6 +1172,32 @@ void left5(uint8_t speed, uint8_t backBrakeTime){
 
   turn(leftSide, 4, speed, backBrakeTime);
 }
+void left6(uint8_t speed, uint8_t backBrakeTime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+  
+  if(debug != no_debug){
+    sprintf(d,getText(57).c_str(),nFunc,speed,backBrakeTime);
+    logPrint(d);
+  }
+  if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
+
+  turn(leftSide, 5, speed, backBrakeTime);
+}
+void left7(uint8_t speed, uint8_t backBrakeTime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+  
+  if(debug != no_debug){
+    sprintf(d,getText(57).c_str(),nFunc,speed,backBrakeTime);
+    logPrint(d);
+  }
+  if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
+
+  turn(leftSide, 6, speed, backBrakeTime);
+}
 // sudah
 void right(uint8_t speed, uint8_t backBrakeTime){
   if(isModeCount) return;
@@ -1169,6 +1211,32 @@ void right(uint8_t speed, uint8_t backBrakeTime){
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
 
   turn(rightSide, 6, speed, backBrakeTime);
+}
+void right10(uint8_t speed, uint8_t backBrakeTime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+  
+  if(debug != no_debug){
+    sprintf(d,getText(59).c_str(),nFunc,speed,backBrakeTime);
+    logPrint(d);
+  }
+  if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
+
+  turn(rightSide, 9, speed, backBrakeTime);
+}
+void right9(uint8_t speed, uint8_t backBrakeTime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+  
+  if(debug != no_debug){
+    sprintf(d,getText(59).c_str(),nFunc,speed,backBrakeTime);
+    logPrint(d);
+  }
+  if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
+
+  turn(rightSide, 8, speed, backBrakeTime);
 }
 void right8(uint8_t speed, uint8_t backBrakeTime){
   if(isModeCount) return;
@@ -1255,7 +1323,7 @@ void exline(int8_t leftMotorSpeed, int8_t rightMotorSpeed, uint8_t sensor, int16
   while(!lineDetected){
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
-    uint8_t line = 0x00;
+    uint16_t line = 0x00;
     senData2Bin(&line);  
     if((line & sensor) == sensor) lineDetected = true;
     if(isTraceForward){
@@ -1267,7 +1335,7 @@ void exline(int8_t leftMotorSpeed, int8_t rightMotorSpeed, uint8_t sensor, int16
   while(lineDetected){
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
-    uint8_t line = 0x00;
+    uint16_t line = 0x00;
     senData2Bin(&line);  
     if((line & sensor) == 0x00) lineDetected = false;  
     if(isTraceForward){
@@ -1323,7 +1391,7 @@ void exturn(int8_t leftMotorSpeed, int8_t rightMotorSpeed, uint8_t sensor, int16
   while(!lineDetected){
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
-    uint8_t line = 0x00;
+    uint16_t line = 0x00;
     senData2Bin(&line);
     if((line & sensor) == sensor) lineDetected = true;
     
@@ -1398,7 +1466,7 @@ void linefind(int8_t leftSpeed, int8_t rightSpeed, uint16_t timeToDisregardLine)
     else readSensor(bb);
 
     motor_f(leftSpeed, rightSpeed, 0);
-    for(int8_t i=0; i<8; i++){
+    for(int8_t i=0; i<10; i++){
       if(senData[i]){
         if((unsigned long) millis()-timeStart > timeToDisregardLine){
           isFound = true;
@@ -1465,7 +1533,7 @@ void sline(uint8_t sensor, uint8_t speed, int16_t backBrakeTime){
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
 
-    uint8_t line = 0;
+    uint16_t line = 0;
     senData2Bin(&line);
 
     if((line & sensor) == sensor) lineDetected = true;
@@ -1477,7 +1545,7 @@ void sline(uint8_t sensor, uint8_t speed, int16_t backBrakeTime){
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
     
-    uint8_t line = 0;
+    uint16_t line = 0;
     senData2Bin(&line);
 
     if((line & sensor) == 0x00) break;
@@ -1517,7 +1585,7 @@ void lostline(uint16_t lostLineTime, uint8_t speed, uint16_t runTime, int16_t ba
   while((unsigned long) millis()-timeStart <= runTime){
     if(isTraceForward) readSensor(ff);
     else readSensor(bb);
-    uint8_t line = 0;
+    uint16_t line = 0;
     senData2Bin(&line);
     if(line != 00) flag = false; // jika sensor mendeteksi garis dimanapun itu, gagalkan pendeteksian
     if(line == 0 && flag == false){ // jika sensor tidak mendeteksi garis dan flagnya masih gagal, maka tandai dan mulai hitungn
@@ -1558,13 +1626,11 @@ void setup(){
   digitalWrite(LED_BUILTIN, 0);
   digitalWrite(buzz, 0);
   
-  #ifdef ROBOT_NEW
   pinMode(PA1, INPUT);
   pinMode(PA8, INPUT);
   attachInterrupt(digitalPinToInterrupt(PA1), pulseCountL, RISING);
   attachInterrupt(digitalPinToInterrupt(PA8), pulseCountR, RISING);
   pwmtimer2.setPeriod(50);
-  #endif
 
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.display();
