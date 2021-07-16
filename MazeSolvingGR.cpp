@@ -118,10 +118,10 @@ void readSensor(bool wichSensor){
     char in = os->read();
     if(i == 0){
       if( in != 'H') break;
-    } else if ( i>0 && i<9){
+    } else if ( i>0 && i<11){
       if(!isDigit(in)) break;
       temp[i-1] = (in == '0' ? 0 : 1);
-    } else if(i == 9){
+    } else if(i == 11){
       if( in != 'T' ) break;
       for( i =0; i<10; i++){
         senData[i] = temp[i];
@@ -340,10 +340,10 @@ void displayMenu(){
 
   display.setCursor(0,48);
   readSensor(ff);
-  sprintf(d,getText(73).c_str(), senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7]);
+  sprintf(d,getText(73).c_str(), senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7], senData[8], senData[9]);
   display.println(d);
   readSensor(bb);
-  sprintf(d,getText(74).c_str(), senData[7], senData[6], senData[5], senData[4], senData[3], senData[2], senData[1], senData[0]);
+  sprintf(d,getText(74).c_str(), senData[9], senData[8], senData[7], senData[6], senData[5], senData[4], senData[3], senData[2], senData[1], senData[0]);
   display.println(d);
   display.display();
 }
