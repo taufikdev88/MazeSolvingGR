@@ -13,6 +13,14 @@
 #define btnStep PB3
 #define btnDebug PB5
 #define btnGo PB4
+
+// MPU6050_ADDR    
+MPU6050 mpu6050(Wire);
+
+//Servo_ADDR
+Adafruit_PWMServoDriver srv = Adafruit_PWMServoDriver();
+
+
 /*
  * Object declaration
  */
@@ -70,6 +78,10 @@ bool senData[10] = {0}; // menyimpan nilai sensor
 char d[50] = {0}; // variable untuk digunakan bersama untuk sprint log
 String mazeLog[2]; // variable untuk log terakhir saat menjalankan mode debugging
 
+
+//IMU
+float yaw = 0;
+
 // **************************************************************************************************
 
 /************************************* fungsi yang tidak di tampilkan ke pengguna *******************/
@@ -99,6 +111,19 @@ int getRPMR(){
   attachInterrupt(digitalPinToInterrupt(PA1),pulseCountR,RISING);
   return rpm;
 }
+
+void turnAngle()
+{
+  mpu6050.update();
+  yaw = mpu6050.getAngleZ();
+}
+
+void servo(int pin, uint16_t deg) // servo running control pin 0- 7 
+{
+  uint16_t pls = deg / 180.0 *450 + 150;
+  srv.setPWM(pin, 0, pls);
+}
+
 
 // ----------------------- fungsi independen / tidak bergantung ke fungsi yang lain -- posisi atas
 // fungsi pembacaan nilai dari sensor depan dan belakang termasuk dengan parsing dan menyimpan ke variable senData
@@ -282,24 +307,24 @@ void kinematik(int8_t leftSpeed, int8_t rightSpeed){
   if(leftSpeed < 0){
     fSpeed = (float) leftSpeed / -20.0;
     fSpeed = constrain(((fSpeed * PWM_RESOLUTION) + leftMotorStartPwmB), 0, PWM_RESOLUTION);
-    pwmWrite(pwm1, fSpeed);
-    pwmWrite(pwm2, 0);
+    pwmWrite(pwm1, 0);
+    pwmWrite(pwm2, fSpeed);
   } else {
     fSpeed = (float) leftSpeed / 20.0;
     fSpeed = constrain(((fSpeed * PWM_RESOLUTION) + leftMotorStartPwmF), 0, PWM_RESOLUTION);
-    pwmWrite(pwm1, 0);
-    pwmWrite(pwm2, fSpeed);
+    pwmWrite(pwm1, fSpeed);
+    pwmWrite(pwm2, 0);
   }
   if(rightSpeed < 0){
     fSpeed = (float) rightSpeed / -20.0;
     fSpeed = constrain(((fSpeed * PWM_RESOLUTION) + rightMotorStartPwmB), 0, PWM_RESOLUTION);
-    pwmWrite(pwm3, fSpeed);
-    pwmWrite(pwm4, 0);
+    pwmWrite(pwm3, 0);
+    pwmWrite(pwm4, fSpeed);
   } else {
     fSpeed = (float) rightSpeed / 20.0;
     fSpeed = constrain(((fSpeed * PWM_RESOLUTION) + rightMotorStartPwmF), 0, PWM_RESOLUTION);
-    pwmWrite(pwm3, 0);
-    pwmWrite(pwm4, fSpeed);
+    pwmWrite(pwm3, fSpeed);
+    pwmWrite(pwm4, 0);
   }
 }
 void motor_f(int8_t leftSpeed, int8_t rightSpeed, uint16_t runTime = 0){
@@ -1613,6 +1638,8 @@ void setup(){
   bsensor.begin(115200);
   fsensor.begin(115200);
   pwmtimer.setPeriod(50);
+  srv.begin();
+  srv.setPWMFreq(60); // Analog servos run at ~60 Hz updates
   pinMode(pwm1, PWM);
   pinMode(pwm2, PWM);
   pinMode(pwm3, PWM);
@@ -1626,13 +1653,22 @@ void setup(){
   digitalWrite(LED_BUILTIN, 0);
   digitalWrite(buzz, 0);
   
+  pinMode(PA0, INPUT);
   pinMode(PA1, INPUT);
-  pinMode(PA8, INPUT);
-  attachInterrupt(digitalPinToInterrupt(PA1), pulseCountL, RISING);
-  attachInterrupt(digitalPinToInterrupt(PA8), pulseCountR, RISING);
+  attachInterrupt(digitalPinToInterrupt(PA0), pulseCountL, RISING);
+  attachInterrupt(digitalPinToInterrupt(PA1), pulseCountR, RISING);
   pwmtimer2.setPeriod(50);
 
+  // mpu6050.begin();
+  // mpu6050.calcGyroOffsets(true);
+  // mpu6050.calcGyroOffsets(false);
+  // mpu6050.calcGyroOffsets(true);
+  // digitalWrite(buzz, 1);
+  // delay(500);
+  // digitalWrite(buzz, 0);
+
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
+
   display.display();
   delay(10);
   display.clearDisplay();
@@ -1722,7 +1758,9 @@ void setup(){
   dtostrf((millis()-startTime)/1000.0,10,3,tf);
   sprintf(d,getText(77).c_str(),tf);
   logPrint(d);
+
 }
 
 void loop(){
+
 }

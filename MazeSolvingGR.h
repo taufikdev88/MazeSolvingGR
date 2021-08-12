@@ -11,6 +11,9 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306_STM32.h>
+#include <MPU6050_Maze.h>
+#include <Adafruit_PWMServoDriver.h>
+
 /*
  * Global name
  */
@@ -50,6 +53,7 @@
 #define sensor8 4
 #define sensor9 2
 #define sensor10 1
+
 
 /*
  * Defined function
@@ -122,4 +126,9 @@ void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir
 
 void sline(uint8_t sensor, uint8_t speed, int16_t backBrakeTime);
 void lostline(uint16_t lostLineTime, uint8_t speed, uint16_t runTime, int16_t backBrakeTime);
+
+void turnAngle();
+
+void servo(int pin, uint16_t deg);
+
 #endif

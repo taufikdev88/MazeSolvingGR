@@ -1,1 +1,0 @@
-%d. ffspeed(%d,%d);
