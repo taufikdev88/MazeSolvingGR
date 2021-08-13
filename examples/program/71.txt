@@ -1,1 +1,0 @@
-%d. lostline(%d,%d,%d,%d);

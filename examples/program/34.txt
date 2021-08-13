@@ -1,1 +1,0 @@
-%d. buzzerled(%d,%d,%d,%d,%d);

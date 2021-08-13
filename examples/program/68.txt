@@ -1,1 +1,0 @@
-%d. linedline(%d,%d,%d,%d,%d,%d);
