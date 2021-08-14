@@ -124,7 +124,6 @@ void servo(int pin, uint16_t deg) // servo running control pin 0- 7
   srv.setPWM(pin, 0, pls);
 }
 
-
 // ----------------------- fungsi independen / tidak bergantung ke fungsi yang lain -- posisi atas
 // fungsi pembacaan nilai dari sensor depan dan belakang termasuk dengan parsing dan menyimpan ke variable senData
 void readSensor(bool wichSensor){
@@ -169,6 +168,7 @@ void readSensor(bool wichSensor){
 #define isBtn2 isBtnStep
 #define isBtn3 isBtnDebug
 #define isBtn4 isBtnGo
+
 bool isBtnGo(){
   uint8_t cnt = 0;
   for(uint8_t i=0; i<MAX_DETECT; i++){

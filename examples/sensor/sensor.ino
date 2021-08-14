@@ -214,12 +214,6 @@ void loop() {
       case '7':
       Serial.println(getSensorValue(7));
       break;
-      case '8':
-      Serial.println(getSensorValue(8));
-      break;
-      case '9':
-      Serial.println(getSensorValue(9));
-      break;
       case 'Y':
       Serial.print(F("H"));
       for(uint8_t i=0; i<sensorTotal; i++){
