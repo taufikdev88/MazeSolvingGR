@@ -4,7 +4,7 @@
  * TX RX 3.3 Gnd
  * 
  */
-#include <EEPROM.h>
+#include <Wire.h>
 
 #define s0 PB1
 #define s1 PB0
@@ -18,9 +18,14 @@
 #define s9 PA0
 
 const uint8_t sPin[10] = { s0, s1, s2, s3, s4, s5, s6, s7, s8, s9 };
+
 const int sensorTotal = (sizeof(sPin)/sizeof(sPin[0]));
 uint16_t thSensor[sensorTotal] = { 0 };
 bool isBlackLine = true;
+
+#define btn1 PB4
+#define btn2 PB5
+#define led PA8
 
 /*
  * Fungsi mengambil nilai analog dari sebuah sensor, dengan fungsi sampling agar
@@ -43,60 +48,66 @@ uint16_t getSensorValue(uint8_t pin, bool sampling = true){
 }
 
 /*
+ * Fungsi untuk write data ke EEPROM External melalui komunikasi I2C
+ */
+void writeByteEEPROM(uint16_t address, byte data){
+  if(address > 0x1FFFE){
+    Serial.println(F("Maximum address exceed!!!"));
+    return; // maximum address
+  } 
+
+  Wire.beginTransmission(0x50);
+  Wire.write((uint8_t) (address >> 8));
+  Wire.write((uint8_t) (address & 0xFF));
+  Wire.write(data);
+  Wire.endTransmission();
+  
+  delay(5);
+}
+
+/*
+ * Fungsi untuk mengambil data dari EEPROM External
+ */
+byte readByteEEPROM(uint16_t address){
+  if(address > 0x1FFFE){
+    Serial.println(F("Maximum address exceed!!!"));
+    return 0; // maximum address
+  }
+
+  byte data = 0xFF;
+  Wire.beginTransmission(0x50);
+  Wire.write((uint8_t) (address >> 8));
+  Wire.write((uint8_t) (address & 0xFF));
+  Wire.endTransmission();
+  Wire.requestFrom(0x50, 1);
+  if(Wire.available()) data = Wire.read();
+
+  return data;
+}
+
+/*
  * Fungsi menyimpan nilai sebuah sensor ke eeprom
  */
 void saveValue(int8_t s, uint16_t v){
-  uint16_t address = 0x10;
-  uint16_t status;
-  
   uint8_t high = v >> 8;
   uint8_t low = v & 0xFF;
 
-  status = EEPROM.write(address+s*2, high);
-  //Serial.print("Saving to address ");
-  //Serial.print(address+s*2, HEX);
-  //Serial.print(": ");
-  //Serial.print(high, HEX);
-  //Serial.print(" -> ");
-  //Serial.println(status);
-
-  status = EEPROM.write(address+s*2+1, low);
-  //Serial.print("Saving to address ");
-  //Serial.print(address+s*2+1, HEX);
-  //Serial.print(": ");
-  //Serial.print(low, HEX);
-  //Serial.print(" -> ");
-  //Serial.println(status);
+  writeByteEEPROM(s*2, high);
+  writeByteEEPROM(s*2+1, low);
 }
 
 /*
  * Mengambil nilai sebuah sensor dari eeprom
  */
-uint16_t readValue(int8_t s){
-  uint16_t address = 0x10;
-  uint16_t status;
+uint16_t readValue(uint16_t s){
   uint16_t data;
-  
   uint16_t result = 0x00;
 
-  status = EEPROM.read(address+s*2, &data);
-  //Serial.print("Read address ");
-  //Serial.print(address+s*2, HEX);
-  //Serial.print(": ");
-  //Serial.print(data, HEX);
-  //Serial.print(" -> ");
-  //Serial.println(status);
+  data = readByteEEPROM(s*2);
   result = data << 8;
-  
-  status = EEPROM.read(address+s*2+1, &data);
-  //Serial.print("Read address ");
-  //Serial.print(address+s*2+1, HEX);
-  //Serial.print(": ");
-  //Serial.print(data, HEX);
-  //Serial.print(" -> ");
-  //Serial.println(status);
+
+  data = readByteEEPROM(s*2+1);
   result = result | data;
-  
   return result;
 }
 
@@ -115,6 +126,7 @@ void calibrateSensor(){
   // jalankan kalibrasi selama 10 detik
   unsigned long timestart = millis();
   while((unsigned long) millis()-timestart <= 10000){
+    digitalWrite(led, ((millis()-timestart)/500) % 2);
     for(uint8_t i=0; i<sensorTotal; i++){
       realValue = getSensorValue(sPin[i]);
       if(realValue < value[i][0]) value[i][0] = realValue;
@@ -122,25 +134,47 @@ void calibrateSensor(){
       thSensor[i] = (value[i][0] + value[i][1]) / 2;
     } 
   }
+  digitalWrite(led, 0);
+}
+
+/*
+ * Fungsi pembacaan button
+ */ 
+bool readBtn(uint8_t pin){
+  uint8_t cnt = 0;
+  for(uint8_t i=0; i<5; i++){
+    if(digitalRead(pin) == 0) cnt++;
+    delayMicroseconds(10);
+  }
+  if(cnt > 4) return true;
+  else return false;
 }
 
 //******************************** SETUP ********************************
 void setup(){
   Serial3.begin(115200);
   Serial.begin(115200);
+  delay(10);
+  Serial.println(F("Sensor Starting..."));
 
-  uint16_t status;
-  status = EEPROM.init();
-
-  Serial.print("EEPROM INIT: ");
-  Serial.println(status);
-  
+  Serial.println(F("Read Sensor Threshold..."));
+  Wire.begin();
   for(uint8_t i=0; i<sensorTotal; i++){
     pinMode(sPin[i], INPUT);
     thSensor[i] = readValue(i);
+    Serial.print('S');
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.println(thSensor[i]);
   }
+  pinMode(led, OUTPUT);
+  pinMode(btn1, INPUT_PULLUP);
+  pinMode(btn2, INPUT_PULLUP);
+  Serial.println(F("Sensor Ready!!!"));
 }
 //******************************** LOOP  ********************************
+unsigned long timing = 0;
+bool flag = false;
 void loop() {
   if(Serial.available()){
     char cIn = Serial.read();
@@ -273,6 +307,48 @@ void loop() {
       case 'T':
       Serial3.print(sensorTotal);
       break;
+    }
+  }
+  
+  if(flag == false){
+    if(readBtn(btn1)){
+      timing = millis();
+      digitalWrite(led, 1);
+      while(readBtn(btn1)){};
+      if((unsigned long) millis()-timing >= 2000){
+        flag = true;
+        Serial.println(F("Standby Calibration!"));
+      } else {
+        digitalWrite(led, 0);
+      }
+    }
+    if(readBtn(btn2)){
+      Serial.println(F("Read Threshold From EEPROM"));
+      for(uint8_t i=0; i<sensorTotal; i++){
+        pinMode(sPin[i], INPUT);
+        thSensor[i] = readValue(i);
+        Serial.print('S');
+        Serial.print(i);
+        Serial.print(": ");
+        Serial.println(thSensor[i]);
+      }
+      Serial.println(F("Read Threshold Finished"));
+      delay(1000);
+    }
+  } else {
+    if(readBtn(btn2)){
+      Serial.println(F("Starting Calibration"));
+      flag = false;
+      calibrateSensor();
+      Serial.println(F("Calibration Finished"));
+      for(uint8_t i=0; i<sensorTotal; i++){
+        saveValue(i, thSensor[i]);
+      }
+    }
+    if(readBtn(btn1)){
+      flag = false;
+      Serial.println(F("Cancelling Calibration"));
+      digitalWrite(led, 0);
     }
   }
 }
