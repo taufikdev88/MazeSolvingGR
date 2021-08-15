@@ -4,7 +4,7 @@
  * TX RX 3.3 Gnd
  * 
  */
-#include <EEPROM.h>
+#include <Wire.h>
 
 #define s0 PB1
 #define s1 PB0
@@ -12,13 +12,36 @@
 #define s3 PA6
 #define s4 PA5
 #define s5 PA4
-#define s6 PA1
-#define s7 PA0
+#define s6 PA3
+#define s7 PA2
+#define s8 PA1
+#define s9 PA0
 
-const uint8_t sPin[8] = { PB1, PB0, PA7, PA6, PA5, PA4, PA1, PA0 };
+#define b0 PB4
+#define b1 PB5
+
+#define l0 PA8
+
+const uint8_t sPin[10] = { s0, s1, s2, s3, s4, s5, s6, s7, s8, s9 };
 const int sensorTotal = (sizeof(sPin)/sizeof(sPin[0]));
 uint16_t thSensor[sensorTotal] = { 0 };
 bool isBlackLine = true;
+
+unsigned long timing = 0;
+bool flag = false;
+
+/*
+ * Fungsi membaca tombol dengan sampling
+ */
+bool readBtn(uint8_t pin){
+  uint8_t cnt = 0;
+  for(uint8_t i=0; i<5; i++){
+    if(digitalRead(pin) == 0) cnt ++;
+    delayMicroseconds(10);
+  }
+  if(cnt > 4) return true;
+  return false;
+}
 
 /*
  * Fungsi mengambil nilai analog dari sebuah sensor, dengan fungsi sampling agar
@@ -41,61 +64,50 @@ uint16_t getSensorValue(uint8_t pin, bool sampling = true){
 }
 
 /*
+ * Fungsi simpan byte ke eeprom external
+ */
+void writeByteEEPROM(uint16_t address, byte data){
+  Wire.beginTransmission(0x50);
+  Wire.write((uint8_t) (address >> 8));
+  Wire.write((uint8_t) (address & 0xFF));
+  Wire.write(data);
+  Wire.endTransmission();
+  delay(5);
+}
+
+/*
+ * Fungsi ambil byte dari eeprom
+ */
+byte readByteEEPROM(uint16_t address){
+  byte data = 0xFF;
+  Wire.beginTransmission(0x50);
+  Wire.write((uint8_t) (address >> 8));
+  Wire.write((uint8_t) (address & 0xFF));
+  Wire.endTransmission();
+  Wire.requestFrom(0x50, 1);
+  if(Wire.available()) data = Wire.read();
+  return data;
+}
+
+/*
  * Fungsi menyimpan nilai sebuah sensor ke eeprom
  */
 void saveValue(int8_t s, uint16_t v){
-  uint16_t address = 0x10;
-  uint16_t status;
-  
   uint8_t high = v >> 8;
   uint8_t low = v & 0xFF;
-
-  status = EEPROM.write(address+s*2, high);
-  //Serial.print("Saving to address ");
-  //Serial.print(address+s*2, HEX);
-  //Serial.print(": ");
-  //Serial.print(high, HEX);
-  //Serial.print(" -> ");
-  //Serial.println(status);
-
-  status = EEPROM.write(address+s*2+1, low);
-  //Serial.print("Saving to address ");
-  //Serial.print(address+s*2+1, HEX);
-  //Serial.print(": ");
-  //Serial.print(low, HEX);
-  //Serial.print(" -> ");
-  //Serial.println(status);
+  writeByteEEPROM(s*2, high);
+  writeByteEEPROM(s*2+1, low);
 }
 
 /*
  * Mengambil nilai sebuah sensor dari eeprom
  */
 uint16_t readValue(int8_t s){
-  uint16_t address = 0x10;
-  uint16_t status;
-  uint16_t data;
-  
-  uint16_t result = 0x00;
-
-  status = EEPROM.read(address+s*2, &data);
-  //Serial.print("Read address ");
-  //Serial.print(address+s*2, HEX);
-  //Serial.print(": ");
-  //Serial.print(data, HEX);
-  //Serial.print(" -> ");
-  //Serial.println(status);
-  result = data << 8;
-  
-  status = EEPROM.read(address+s*2+1, &data);
-  //Serial.print("Read address ");
-  //Serial.print(address+s*2+1, HEX);
-  //Serial.print(": ");
-  //Serial.print(data, HEX);
-  //Serial.print(" -> ");
-  //Serial.println(status);
-  result = result | data;
-  
-  return result;
+  uint16_t data = 0x0000;
+  data = readByteEEPROM(s*2);
+  data = data << 8;
+  data = data | readByteEEPROM(s*2+1);
+  return data;
 }
 
 /*
@@ -113,6 +125,7 @@ void calibrateSensor(){
   // jalankan kalibrasi selama 10 detik
   unsigned long timestart = millis();
   while((unsigned long) millis()-timestart <= 10000){
+    digitalWrite(l0, (((unsigned long) millis()-timestart) / 500) % 2);
     for(uint8_t i=0; i<sensorTotal; i++){
       realValue = getSensorValue(sPin[i]);
       if(realValue < value[i][0]) value[i][0] = realValue;
@@ -120,23 +133,24 @@ void calibrateSensor(){
       thSensor[i] = (value[i][0] + value[i][1]) / 2;
     } 
   }
+  digitalWrite(l0, 0);
 }
 
 //******************************** SETUP ********************************
 void setup(){
-  Serial2.begin(115200);
+  Serial3.begin(115200);
   Serial.begin(115200);
-
-  uint16_t status;
-  status = EEPROM.init();
-
-  Serial.print("EEPROM INIT: ");
-  Serial.println(status);
+  Wire.begin();
   
   for(uint8_t i=0; i<sensorTotal; i++){
     pinMode(sPin[i], INPUT);
     thSensor[i] = readValue(i);
   }
+
+  pinMode(b0, INPUT_PULLUP);
+  pinMode(b1, INPUT_PULLUP);
+  pinMode(l0, OUTPUT);
+  digitalWrite(l0, 0);
 }
 //******************************** LOOP  ********************************
 void loop() {
@@ -155,28 +169,34 @@ void loop() {
       Serial.println('T');
       break;
       case '0':
-      Serial.println(getSensorValue(0));
+      Serial.println(getSensorValue(sPin[0]));
       break;
       case '1':
-      Serial.println(getSensorValue(1));
+      Serial.println(getSensorValue(sPin[1]));
       break;
       case '2':
-      Serial.println(getSensorValue(2));
+      Serial.println(getSensorValue(sPin[2]));
       break;
       case '3':
-      Serial.println(getSensorValue(3));
+      Serial.println(getSensorValue(sPin[3]));
       break;
       case '4':
-      Serial.println(getSensorValue(4));
+      Serial.println(getSensorValue(sPin[4]));
       break;
       case '5':
-      Serial.println(getSensorValue(5));
+      Serial.println(getSensorValue(sPin[5]));
       break;
       case '6':
-      Serial.println(getSensorValue(6));
+      Serial.println(getSensorValue(sPin[6]));
       break;
       case '7':
-      Serial.println(getSensorValue(7));
+      Serial.println(getSensorValue(sPin[7]));
+      break;
+      case '8':
+      Serial.println(getSensorValue(sPin[8]));
+      break;
+      case '9':
+      Serial.println(getSensorValue(sPin[9]));
       break;
       case 'Y':
       Serial.print(F("H"));
@@ -232,33 +252,33 @@ void loop() {
     }
   }
   
-  if(Serial2.available()){
-    char cIn = Serial2.read();
+  if(Serial3.available()){
+    char cIn = Serial3.read();
 
     switch(cIn){
       case 'A':
       Serial.println("Read all sensor detection");
-      Serial2.print(F("H"));
+      Serial3.print(F("H"));
       for(uint8_t i=0; i<sensorTotal; i++){
         bool biggerThanThreshold = (getSensorValue(sPin[i]) < thSensor[i]);
         if(isBlackLine) biggerThanThreshold = !biggerThanThreshold;
           
-        Serial2.print(biggerThanThreshold);
+        Serial3.print(biggerThanThreshold);
         Serial.print(biggerThanThreshold);
       }
       Serial.println();
-      Serial2.print('T');
+      Serial3.print('T');
       break;
       case 'S':
       Serial.println("Saving to EEPROM");
       for(uint8_t i=0; i<sensorTotal; i++){
         saveValue(i, thSensor[i]);
       }
-      Serial2.print('D');
+      Serial3.print('D');
       break;
       case 'C':
       calibrateSensor();
-      Serial2.print('D');
+      Serial3.print('D');
       break;
       case 'B':
       isBlackLine = true;
@@ -269,8 +289,33 @@ void loop() {
       Serial.println("Line set to white");
       break;
       case 'T':
-      Serial2.print(sensorTotal);
+      Serial3.print(sensorTotal);
       break;
+    }
+  }
+
+  if(flag == true){
+    if(readBtn(b0)){
+      flag = false;
+      digitalWrite(l0, 0);
+    }
+    if(readBtn(b1)){
+      flag = false;
+      calibrateSensor();
+      for(uint8_t i=0; i<sensorTotal; i++){
+        saveValue(i, thSensor[i]);
+      }
+    }
+  } else {
+    if(readBtn(0)){
+      timing = millis();
+      digitalWrite(l0, 1);
+      while(readBtn(0));
+      if((unsigned long) millis()-timing > 1000){
+        flag = true;
+      } else {
+        digitalWrite(l0, 0);
+      }
     }
   }
 }
