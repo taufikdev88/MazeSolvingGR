@@ -1,4 +1,96 @@
 #include "MazeSolvingGR.h"
+/*
+ * String format addressing and length
+ */
+struct StrFormat {
+  uint32_t startAddress;
+  uint8_t length;
+};
+const StrFormat MenuCalibNew{0,19}; // 1
+const StrFormat MenuCalibTest{19,20}; 
+const StrFormat MenuCalibSave{39,20}; 
+const StrFormat MenuFrontSensor{59,16}; 
+const StrFormat MenuRearSensor{75,15};
+const StrFormat MenuExit{90,11};
+const StrFormat MenuMode{101,11};
+const StrFormat MenuStep{112,11};
+const StrFormat MenuDebug{123,11};
+const StrFormat MenuNext{134,11};
+const StrFormat MenuBack{145,11}; // 11
+const StrFormat MenuMirror{156,10};
+const StrFormat MenuNormal{166,10};
+const StrFormat MenuInfoMode{176,7};
+const StrFormat MenuInfoStep{183,7};
+const StrFormat MenuInfoDebug{190,7};
+const StrFormat InfoNoDebug{197,8};
+const StrFormat InfoByFunc{205,7};
+const StrFormat InfoByStep{212,7};
+const StrFormat InfoMirror{219,6};
+const StrFormat InfoNormal{225,6}; // 21
+const StrFormat InfoCountError{231,11}; 
+const StrFormat InfoSensorNotDetected{242,23};
+const StrFormat InfoSensorWrong{265,12};
+const StrFormat InfoSaveSuccess{277,18};
+const StrFormat InfoSaveFail{295,15};
+const StrFormat InfoCalibTimeout{310,17};
+const StrFormat InfoCalibFinish{327,17};
+const StrFormat InfoCalibFail{344,15};
+const StrFormat InfoLineBlack{359,5};
+const StrFormat InfoLineWhite{364,5}; // 31
+const StrFormat InfoFF{369,2}; 
+const StrFormat InfoBB{371,2};
+const StrFormat InfoSdCardError{373,16};
+const StrFormat InfoDelimiter{389,21};
+const StrFormat FuncBuzzerLed{410,30};
+const StrFormat FuncResetTimer{440,17};
+const StrFormat FuncPcTimer{457,16};
+const StrFormat FuncLineColor{473,18};
+const StrFormat FuncSensor{491,15};
+const StrFormat FuncError{506,17}; // 41
+const StrFormat FuncController{523,22};
+const StrFormat FuncFfSpeed{545,19};
+const StrFormat FuncBbSpeed{564,19};
+const StrFormat FuncLineTrack{583,18};
+const StrFormat FuncMotor{601,20};
+const StrFormat FuncLine{621,22};
+const StrFormat FuncLineT{643,26};
+const StrFormat FuncTimeline{669,29};
+const StrFormat FuncLeft{698,16};
+const StrFormat FuncLeft1{714,17}; // 51
+const StrFormat FuncLeft2{731,17};
+const StrFormat FuncLeft3{748,17};
+const StrFormat FuncLeft4{765,17};
+const StrFormat FuncLeft5{782,17};
+const StrFormat FuncLeft6{799,17};
+const StrFormat FuncLeft7{816,17};
+const StrFormat FuncRight{833,17};
+const StrFormat FuncRight10{850,19};
+const StrFormat FuncRight9{869,18};
+const StrFormat FuncRight8{887,18}; // 61
+const StrFormat FuncRight7{905,18};
+const StrFormat FuncRight6{923,18};
+const StrFormat FuncRight5{941,18};
+const StrFormat FuncRight4{959,18};
+const StrFormat FuncExline{977,24};
+const StrFormat FuncExturn{1001,24};
+const StrFormat FuncLineDelay{1025,24};
+const StrFormat FuncLineFind{1049,23};
+const StrFormat FuncLineDLine{1072,33};
+const StrFormat FuncLineTLine{1105,33}; // 71
+const StrFormat FuncSLine{1138,20};
+const StrFormat FuncLostLine{1158,26};
+const StrFormat InfoFrontSensor{1184,24};
+const StrFormat InfoRearSensor{1208,24};
+const StrFormat InfoLineSensor{1232,20};
+const StrFormat InfoStep{1252,7};
+const StrFormat InfoTimeSpent{1259,13};
+const StrFormat InfoYourTime{1272,13};
+const StrFormat InfoLineMissing{1285,12};
+
+/*
+ * EEPROM ADDRESSING
+ */
+#define modeaddr 0x10000
 
 /*
  * Pin declaration
@@ -9,6 +101,7 @@
 #define pwm4 PB9
 
 #define buzz PA8
+
 #define btnMode PA15
 #define btnStep PB3
 #define btnDebug PB5
@@ -20,14 +113,13 @@ MPU6050 mpu6050(Wire);
 //Servo_ADDR
 Adafruit_PWMServoDriver srv = Adafruit_PWMServoDriver();
 
-
 /*
  * Object declaration
  */
 #define OLED_RESET 4
 Adafruit_SSD1306 display(OLED_RESET);
-HardwareTimer pwmtimer(4);
-HardwareTimer pwmtimer2(3);
+HardwareTimer pwmtimer(4); // untuk motor kiri
+HardwareTimer pwmtimer2(3); // untuk motor kanan
 /*
  * Global variable
  */
@@ -75,9 +167,7 @@ uint8_t leftMotorStartPwmB = 0;
 uint8_t rightMotorStartPwmB = 0;
 // maze data
 bool senData[10] = {0}; // menyimpan nilai sensor
-char d[50] = {0}; // variable untuk digunakan bersama untuk sprint log
 String mazeLog[2]; // variable untuk log terakhir saat menjalankan mode debugging
-
 
 //IMU
 float yaw = 0;
@@ -147,10 +237,10 @@ void readSensor(bool wichSensor){
       temp[i-1] = (in == '0' ? 0 : 1);
     } else if(i == 11){
       if( in != 'T' ) break;
-      for( i =0; i<10; i++){
+      for(i=0; i<10; i++){
         senData[i] = temp[i];
       }
-      i = 10; // keluar loop
+      i = 11; // keluar loop
       isSuccess = true;
     }
   }
@@ -161,93 +251,88 @@ void readSensor(bool wichSensor){
     }
   }
 }
-// fungsi pembacaan tombol  
-#define MAX_DETECT 7
-#define MIN_DETECT 4
-#define isBtn1 isBtnMode
-#define isBtn2 isBtnStep
-#define isBtn3 isBtnDebug
-#define isBtn4 isBtnGo
+// fungsi pembacaan tombol
+#define isBtn1() readBtn(btnMode)
+#define isBtn2() readBtn(btnStep)
+#define isBtn3() readBtn(btnDebug)
+#define isBtn4() readBtn(btnGo)
+#define isBtnMode() readBtn(btnMode)
+#define isBtnStep() readBtn(btnStep)
+#define isBtnDebug() readBtn(btnDebug)
+#define isBtnGo() readBtn(btnGo)
+bool readBtn(uint8_t btn){
+  uint8_t cnt = 0;
+  for(uint8_t i=0; i<7; i++){
+    if(digitalRead(btn) == 0) cnt++;
+    delayMicroseconds(10);
+  }
+  if(cnt > 4) return true;
+  return false;
+}
+// fungsi penulisan byte ke EEPROM External
+void writeByteEEPROM(uint32_t address, byte data){
+  if(address > 0x1FFFE){
+    Serial.println(F("Maximum address exceed!!!"));
+    return; // maximum address
+  } 
 
-bool isBtnGo(){
-  uint8_t cnt = 0;
-  for(uint8_t i=0; i<MAX_DETECT; i++){
-    if(digitalRead(btnGo) == 0) cnt++;
-    delayMicroseconds(10);
+  uint8_t EEPROM_ADDR = 0x50;
+  if(address > 0xFFFF){
+    EEPROM_ADDR = 0x51;
+    address -= 0xFFFF;
   }
-  if(cnt > MIN_DETECT) return true;
-  return false;
+
+  Wire.beginTransmission(EEPROM_ADDR);
+  Wire.write((uint8_t) (address >> 8));
+  Wire.write((uint8_t) (address & 0xFF));
+  Wire.write(data);
+  Wire.endTransmission();
+  
+  delay(5);
 }
-bool isBtnStep(){
-  uint8_t cnt = 0;
-  for(uint8_t i=0; i<MAX_DETECT; i++){
-    if(digitalRead(btnStep) == 0) cnt++;
-    delayMicroseconds(10);
+// fungsi pembacaan byte dari EEPROM External
+byte readByteEEPROM(uint32_t address){
+  if(address > 0x1FFFE){
+    Serial.println(F("Maximum address exceed!!!"));
+    return 0; // maximum address
+  } 
+
+  uint8_t EEPROM_ADDR = 0x50;
+  if(address > 0xFFFF){
+    EEPROM_ADDR = 0x51;
+    address -= 0xFFFF;
   }
-  if(cnt > MIN_DETECT) return true;
-  return false;
+
+  byte data = 0xFF;
+  Wire.beginTransmission(EEPROM_ADDR);
+  Wire.write((uint8_t) (address >> 8));
+  Wire.write((uint8_t) (address & 0xFF));
+  Wire.endTransmission();
+  Wire.requestFrom(EEPROM_ADDR, 1);
+  if(Wire.available()) data = Wire.read();
+
+  return data;
 }
-bool isBtnMode(){
-  uint8_t cnt = 0;
-  for(uint8_t i=0; i<MAX_DETECT; i++){
-    if(digitalRead(btnMode) == 0) cnt++;
-    delayMicroseconds(10);
+// fungsi pengambilan String Format dari EEPROM
+String getStringFormat(StrFormat strFormat){
+  String result = "";
+  for(uint32_t addr = strFormat.startAddress; addr < (strFormat.startAddress + strFormat.length); addr++){
+    result += (char) readByteEEPROM(addr);
   }
-  if(cnt > MIN_DETECT) return true;
-  return false;
+  return result;
 }
-bool isBtnDebug(){
-  uint8_t cnt = 0;
-  for(uint8_t i=0; i<MAX_DETECT; i++){
-    if(digitalRead(btnDebug) == 0) cnt++;
-    delayMicroseconds(10);
-  }
-  if(cnt > MIN_DETECT) return true;
-  return false;
-}
-// fungsi untuk mengambil format string dari sd card untuk menghemat flash memory untuk keperluan log
-String getText(uint8_t i){
-  char filename[16] = {0};
-  sprintf(filename,"program/%d.txt",i);
-  File file;
-  file = SD.open(filename);
-  String temp = "";
-  if(file){
-    while(file.available()){
-      temp += (char) file.read();
-    }
-    file.close();
-  }
-  return temp;
-}
-const char mode_n[3] = "md";
 // fungsi mengambil last mode yang dijalankan oleh robot
+// disimpan di address pertama EEPROM external ke 2
+const char mode_n[3] = "md";
 void getLastMode(){
-  File file;
-  if(!SD.exists(mode_n)){
+  runMode = readByteEEPROM(modeaddr);
+  if(runMode < 1 || runMode > 3){
     runMode = 1;
-    file = SD.open(mode_n, FILE_WRITE);
-    file.write('1');
-  } else {
-    file = SD.open(mode_n);
-    switch ((char) file.read()){
-      case '1': runMode = 1; break;
-      case '2': runMode = 2; break;
-      case '3': runMode = 3; break;
-    }
   }
-  file.close();
 }
 // fungsi menyimpan last mode yang dijalankan oleh robot
 void setLastMode(){
-  SD.remove(mode_n);
-  File file;
-  switch(runMode){
-    case 1: file = SD.open(mode_n, FILE_WRITE); file.write('1'); break;
-    case 2: file = SD.open(mode_n, FILE_WRITE); file.write('2'); break;
-    case 3: file = SD.open(mode_n, FILE_WRITE); file.write('3'); break;
-  }
-  file.close();
+  writeByteEEPROM(modeaddr, runMode);
 }
 // fungsi menghitung berapa jumlah setpoint yang diatur dari masing masing mode
 void countSetpoint(){
@@ -268,11 +353,11 @@ void logPrint(String newLog){
   display.print(runMode); display.print(F(" / "));
   // display.print(runMode); display.print(F(" / ")); display.print(isMirror ? getText(31):getText(32)); display.print(F(" / ")); 
   switch (debug){
-    case no_debug: display.println(getText(13)); break;
-    case by_func: display.println(getText(14)); break;
-    case by_step: display.println(getText(15)); break;
+    case no_debug: display.println(getStringFormat(InfoNoDebug)); break;
+    case by_func: display.println(getStringFormat(InfoByFunc)); break;
+    case by_step: display.println(getStringFormat(InfoByStep)); break;
   }
-  display.println(getText(33));
+  display.println(getStringFormat(InfoDelimiter));
   display.setCursor(0,16);
   mazeLog[0] = mazeLog[1];
   mazeLog[1] = newLog;
@@ -350,31 +435,32 @@ void motor_f(int8_t leftSpeed, int8_t rightSpeed, uint16_t runTime = 0){
 void displayMenu(){
   display.clearDisplay();
   display.setCursor(0,0);
-  display.print(getText(10)); display.println(runMode);
-  display.print(getText(11)); display.println(nStep);
-  display.print(getText(12)); 
+  display.print(getStringFormat(MenuInfoMode)); display.println(runMode);
+  display.print(getStringFormat(MenuInfoStep)); display.println(nStep);
+  display.print(getStringFormat(MenuInfoDebug)); 
   switch(debug){
-    case 0: display.println(getText(13)); break;
-    case 1: display.println(getText(14)); break;
-    case 2: display.println(getText(15)); break;
-    default: debug = 0; break;
+    case no_debug: display.println(getStringFormat(InfoNoDebug)); break;
+    case by_func: display.println(getStringFormat(InfoByFunc)); break;
+    case by_step: display.println(getStringFormat(InfoByStep)); break;
+    default: debug = no_debug; break;
   }
-  display.println(getText(16));
+
+  display.println(getStringFormat(MenuNext));
+  char d[getStringFormat(InfoFrontSensor).length() + 10] = {0};
   sprintf(d,"rpm_l:%d r:%d", counterL, counterR);
   display.println(d);
 
   display.setCursor(0,48);
   readSensor(ff);
-  sprintf(d,getText(73).c_str(), senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7], senData[8], senData[9]);
+  sprintf(d,getStringFormat(InfoFrontSensor).c_str(), senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7], senData[8], senData[9]);
   display.println(d);
   readSensor(bb);
-  sprintf(d,getText(74).c_str(), senData[9], senData[8], senData[7], senData[6], senData[5], senData[4], senData[3], senData[2], senData[1], senData[0]);
+  sprintf(d,getStringFormat(InfoRearSensor).c_str(), senData[9], senData[8], senData[7], senData[6], senData[5], senData[4], senData[3], senData[2], senData[1], senData[0]);
   display.println(d);
   display.display();
 }
 // fungsi yang dijalankan saat robot menemukan error
 void errorRaised(){
-  logPrint(getText(9));
   while(1){    
     motor_f(0,0,0);
     digitalWrite(buzz, 1);
@@ -507,7 +593,7 @@ void controllerRun(uint16_t line, int8_t speed, bool useError = true){
     case 0b0000000000: 
     error = 0;
     if(!isErrorDetect){
-      logPrint(getText(17));
+      logPrint(getStringFormat(InfoLineMissing));
       errorStart = millis();
       isErrorDetect = true;
     }
@@ -883,7 +969,8 @@ void step(){
   delay(stepDelay);
 
   if(debug == by_step) {
-    sprintf(d, getText(72).c_str(),mStep);
+    char d[getStringFormat(InfoStep).length() + 2] = {0};
+    sprintf(d, getStringFormat(InfoStep).c_str(),mStep);
     logPrint(d);
     while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);
   }
@@ -900,7 +987,8 @@ void buzzerled(bool useBuzzer, bool useLED, uint8_t numberOfTimes, uint16_t inte
   if(mStep < nStep) return; // hanya berlaku untuk fungsi yang tidak berfungsi untuk mengatur config maze
   
   if(debug != no_debug && !isErrorDetect){
-    sprintf(d, getText(34).c_str(),nFunc,useBuzzer,useLED,numberOfTimes,interval,customOffTime);
+    char d[getStringFormat(FuncBuzzerLed).length()+15] = {0};
+    sprintf(d, getStringFormat(FuncBuzzerLed).c_str(),nFunc,useBuzzer,useLED,numberOfTimes,interval,customOffTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -941,7 +1029,8 @@ void resettimer(){
   ++nFunc;
   
   if(debug != no_debug){
-    sprintf(d,getText(35).c_str(),nFunc);
+    char d[getStringFormat(FuncResetTimer).length() + 2] = {0};
+    sprintf(d,getStringFormat(FuncResetTimer).c_str(),nFunc);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -954,7 +1043,8 @@ void pctimer(uint16_t pc){
   ++nFunc;
   
   if(debug != no_debug){
-    sprintf(d,getText(36).c_str(),pc);
+    char d[getStringFormat(FuncPcTimer).length() + 2] = {0};
+    sprintf(d,getStringFormat(FuncPcTimer).c_str(),pc);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -968,7 +1058,8 @@ void linecolor(bool color){
   ++nFunc;
   
   if(debug != no_debug){
-    sprintf(d,getText(37).c_str(),nFunc,(color == black ? getText(38).c_str():getText(39).c_str()));
+    char d[getStringFormat(FuncLineColor).length() + 5] = {0};
+    sprintf(d,getStringFormat(FuncLineColor).c_str(),nFunc,(color == black ? getStringFormat(InfoLineBlack).c_str():getStringFormat(InfoLineWhite).c_str()));
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -987,7 +1078,8 @@ void sensor(bool dir){
   ++nFunc;
   
   if(debug != no_debug){
-    sprintf(d,getText(40).c_str(),nFunc,(dir==ff?getText(41).c_str():getText(42).c_str()));
+    char d[getStringFormat(FuncSensor).length() + 5] = {0};
+    sprintf(d,getStringFormat(FuncSensor).c_str(),nFunc,(dir==ff?getStringFormat(InfoFF).c_str():getStringFormat(InfoBB).c_str()));
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1004,7 +1096,8 @@ void error(bool useError, uint16_t time){
   ++nFunc;
   
   if(debug != no_debug){
-    sprintf(d,getText(43).c_str(),nFunc,useError,time);
+    char d[getStringFormat(FuncError).length() + 10] = {0};
+    sprintf(d,getStringFormat(FuncError).c_str(),nFunc,useError,time);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1025,7 +1118,8 @@ void controller(float customKp, float customKd){
     char p2[9] = {0};
     dtostrf(customKp,2,5,p1);
     dtostrf(customKd,2,5,p2);
-    sprintf(d,getText(44).c_str(),nFunc,p1,p2);
+    char d[getStringFormat(FuncController).length()+10] = {0};
+    sprintf(d,getStringFormat(FuncController).c_str(),nFunc,p1,p2);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1036,7 +1130,8 @@ void ffspeed(uint8_t l, uint8_t r){
   ++nFunc;
   
   if(debug != no_debug){
-    sprintf(d,getText(45).c_str(),nFunc,l,r);
+    char d[getStringFormat(FuncFfSpeed).length() + 10] = {0};
+    sprintf(d,getStringFormat(FuncFfSpeed).c_str(),nFunc,l,r);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1050,7 +1145,8 @@ void bbspeed(uint8_t l, uint8_t r){
   ++nFunc;
   
   if(debug != no_debug){
-    sprintf(d,getText(46).c_str(),nFunc,l,r);
+    char d[getStringFormat(FuncBbSpeed).length() + 10] = {0};
+    sprintf(d,getStringFormat(FuncBbSpeed).c_str(),nFunc,l,r);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1065,7 +1161,8 @@ void motor(int8_t leftSpeed, int8_t rightSpeed, uint16_t runTime = 0){
   if(mStep < nStep) return;
 
   if(debug != no_debug){
-    sprintf(d,getText(48).c_str(),nFunc,leftSpeed,rightSpeed,runTime);
+    char d[getStringFormat(FuncMotor).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncMotor).c_str(),nFunc,leftSpeed,rightSpeed,runTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1079,7 +1176,8 @@ void line(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(49).c_str(),nFunc,method,dir,speed,brakeTime);
+    char d[getStringFormat(FuncLine).length() + 20] = {0};
+    sprintf(d,getStringFormat(FuncLine).c_str(),nFunc,method,dir,speed,brakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1093,7 +1191,8 @@ void linet(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime, uint16
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(50).c_str(),nFunc,method,dir,speed,brakeTime,actionTime);
+    char d[getStringFormat(FuncLineT).length() + 30] = {0};
+    sprintf(d,getStringFormat(FuncLineT).c_str(),nFunc,method,dir,speed,brakeTime,actionTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1107,7 +1206,8 @@ void timeline(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime, uin
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(51).c_str(),nFunc,method,dir,speed,brakeTime,totalActionTime);
+    char d[getStringFormat(FuncTimeline).length() + 30] = {0};
+    sprintf(d,getStringFormat(FuncTimeline).c_str(),nFunc,method,dir,speed,brakeTime,totalActionTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1125,7 +1225,8 @@ void left(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
 
   if(debug != no_debug){
-    sprintf(d,getText(52).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncLeft).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLeft).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1138,7 +1239,8 @@ void left1(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
 
   if(debug != no_debug){
-    sprintf(d,getText(53).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncLeft1).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLeft1).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1151,7 +1253,8 @@ void left2(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
 
   if(debug != no_debug){
-    sprintf(d,getText(54).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncLeft2).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLeft2).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1164,7 +1267,8 @@ void left3(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(55).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncLeft3).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLeft3).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1177,7 +1281,8 @@ void left4(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(56).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncLeft4).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLeft4).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1190,7 +1295,8 @@ void left5(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(57).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncLeft5).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLeft5).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1203,7 +1309,8 @@ void left6(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(57).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncLeft6).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLeft6).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1216,7 +1323,8 @@ void left7(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(57).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncLeft7).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLeft7).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1230,7 +1338,8 @@ void right(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(58).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncRight).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncRight).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1243,7 +1352,8 @@ void right10(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(59).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncRight10).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncRight10).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1256,7 +1366,8 @@ void right9(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(59).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncRight9).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncRight9).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1269,7 +1380,8 @@ void right8(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(59).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncRight8).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncRight8).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1282,7 +1394,8 @@ void right7(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(60).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncRight7).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncRight7).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1295,7 +1408,8 @@ void right6(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(61).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncRight6).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncRight6).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1308,7 +1422,8 @@ void right5(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(62).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncRight5).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncRight5).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1321,7 +1436,8 @@ void right4(uint8_t speed, uint8_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(63).c_str(),nFunc,speed,backBrakeTime);
+    char d[getStringFormat(FuncRight4).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncRight4).c_str(),nFunc,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1335,7 +1451,8 @@ void exline(int8_t leftMotorSpeed, int8_t rightMotorSpeed, uint8_t sensor, int16
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(64).c_str(),nFunc,leftMotorSpeed,rightMotorSpeed,sensor,backBrakeTime);
+    char d[getStringFormat(FuncExline).length() + 30] = {0};
+    sprintf(d,getStringFormat(FuncExline).c_str(),nFunc,leftMotorSpeed,rightMotorSpeed,sensor,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1403,7 +1520,8 @@ void exturn(int8_t leftMotorSpeed, int8_t rightMotorSpeed, uint8_t sensor, int16
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(65).c_str(),leftMotorSpeed,rightMotorSpeed,sensor,backBrakeTime);
+    char d[getStringFormat(FuncExturn).length() + 20] = {0};
+    sprintf(d,getStringFormat(FuncExturn).c_str(),leftMotorSpeed,rightMotorSpeed,sensor,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1461,7 +1579,8 @@ void linedelay(uint8_t speed, uint16_t runTime, int16_t backBrakeTime){
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(66).c_str(),nFunc,speed,runTime,backBrakeTime);
+    char d[getStringFormat(FuncLineDelay).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncLineDelay).c_str(),nFunc,speed,runTime,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1475,7 +1594,8 @@ void linefind(int8_t leftSpeed, int8_t rightSpeed, uint16_t timeToDisregardLine)
   if(mStep < nStep) return;
   
   if(debug != no_debug){
-    sprintf(d,getText(67).c_str(),nFunc,leftSpeed,rightSpeed,timeToDisregardLine);
+    char d[getStringFormat(FuncLineFind).length() + 25] = {0};
+    sprintf(d,getStringFormat(FuncLineFind).c_str(),nFunc,leftSpeed,rightSpeed,timeToDisregardLine);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1515,7 +1635,8 @@ void linedline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir
   if(mStep < nStep) return;
 
   if(debug != no_debug){
-    sprintf(d,getText(68).c_str(),nFunc,runTime,startSpeed,method,dir,endSpeed,brakeTime);
+    char d[getStringFormat(FuncLineDLine).length() + 30] = {0};
+    sprintf(d,getStringFormat(FuncLineDLine).c_str(),nFunc,runTime,startSpeed,method,dir,endSpeed,brakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1530,7 +1651,8 @@ void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir
   if(mStep < nStep) return;
 
   if(debug != no_debug){
-    sprintf(d,getText(69).c_str(),nFunc,runTime,startSpeed,method,dir,endSpeed,brakeTime);
+    char d[getStringFormat(FuncLineTLine).length() + 30] = {0};
+    sprintf(d,getStringFormat(FuncLineTLine).c_str(),nFunc,runTime,startSpeed,method,dir,endSpeed,brakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1545,7 +1667,8 @@ void sline(uint8_t sensor, uint8_t speed, int16_t backBrakeTime){
   if(mStep < nStep);
 
   if(debug != no_debug){
-    sprintf(d,getText(70).c_str(),nFunc,sensor,speed,backBrakeTime);
+    char d[getStringFormat(FuncSLine).length() + 15] = {0};
+    sprintf(d,getStringFormat(FuncSLine).c_str(),nFunc,sensor,speed,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1595,7 +1718,8 @@ void lostline(uint16_t lostLineTime, uint8_t speed, uint16_t runTime, int16_t ba
   if(mStep < nStep);
 
   if(debug != no_debug){
-    sprintf(d,getText(71).c_str(),nFunc,lostLineTime,speed,runTime,backBrakeTime);
+    char d[getStringFormat(FuncLostLine).length() + 30] = {0};
+    sprintf(d,getStringFormat(FuncLostLine).c_str(),nFunc,lostLineTime,speed,runTime,backBrakeTime);
     logPrint(d);
   }
   if(debug == by_func) {while(digitalRead(btnGo) || (unsigned long) millis()-tButton <= DELAY_BUTTON){}; tButton = millis(); digitalWrite(buzz,1); delay(DELAY_BUZZER); digitalWrite(buzz,0);}
@@ -1674,14 +1798,14 @@ void setup(){
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(WHITE);
-  if (!SD.begin(PA4)) {
-    display.setCursor(0,0);
-    display.println(getText(25));
-    display.display();
-    while(1){
-      buzzerled(1,1,2,500,100);
-    }
-  }
+  // if (!SD.begin(PA4)) {
+  //   display.setCursor(0,0);
+  //   display.println(getText(25));
+  //   display.display();
+  //   while(1){
+  //     buzzerled(1,1,2,500,100);
+  //   }
+  // }
   initMazeRobot();
   getLastMode();
   unsigned long tLcd = millis();
@@ -1725,18 +1849,18 @@ void setup(){
 
   display.clearDisplay();
   display.setCursor(0,0);
-  display.print(getText(26)); display.println(runMode);
-  display.print(getText(27)); display.println(nStep);
-  display.print(getText(28));
+  display.print(getStringFormat(MenuMode)); display.println(runMode);
+  display.print(getStringFormat(MenuStep)); display.println(nStep);
+  display.print(getStringFormat(MenuDebug));
   switch (debug){
-    case no_debug: display.println(getText(13)); break;
-    case by_func: display.println(getText(14)); break;
-    case by_step: display.println(getText(15)); break;
+    case no_debug: display.println(getStringFormat(InfoNoDebug)); break;
+    case by_func: display.println(getStringFormat(InfoByFunc)); break;
+    case by_step: display.println(getStringFormat(InfoByStep)); break;
     default: debug = 0; break;
   }
   display.println();
   display.println();
-  display.println(getText(30));
+  display.println(getStringFormat(MenuNormal));
   display.display();
   while(1){ if(isBtnGo() && (unsigned long) millis()-tButton >= DELAY_BUTTON) break; }
 
@@ -1756,9 +1880,9 @@ void setup(){
 
   char tf[15] = {0};
   dtostrf((millis()-startTime)/1000.0,10,3,tf);
-  sprintf(d,getText(77).c_str(),tf);
+  char d[getStringFormat(InfoYourTime).length() + 10] = {0};
+  sprintf(d,getStringFormat(InfoYourTime).c_str(),tf);
   logPrint(d);
-
 }
 
 void loop(){
