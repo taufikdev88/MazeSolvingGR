@@ -170,7 +170,7 @@ void loop(){
     delay(1);
   }
   #else
-// PROGRAM TES MENGAMBIL FORMAT STRING DARI EEPROM DAN MENAMPILKAN KE SERIAL
+// PROGRAM TES MENGAMBIL FORMAT STRING DARI EEPROM DAN MENAMPILKAN KE SERIAL NEW
   Serial.println(getStringFormat(MenuCalibNew));
   Serial.println(getStringFormat(MenuCalibTest));
   Serial.println(getStringFormat(MenuCalibSave));
