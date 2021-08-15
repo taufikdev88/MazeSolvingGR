@@ -1,14 +1,27 @@
 #include <Wire.h>
 
+<<<<<<< HEAD
+=======
+#define READ_AND_STORE_EPPROM
+/*
+ * Kirim ini di Serial Monitor
+
+ (1) calibration new$(2) calibration test$(3) calibration save$(1) front sensor$(2) rear sensor$(4) exit...$(1) mode : $(2) step : $(3) debug: $(4) next...$(4) back...$(3) mirror$(4) normal$mode : $step : $debug: $no debug$by func$by step$mirror$normal$count error$sensor tidak terdeteksi$sensor salah$berhasil menyimpan$gagal menyimpan$kalibrasi timeout$kalibrasi selesai$kalibrasi gagal$black$white$ff$bb$SD CARD ERROR!!!$=====================$%d. buzzerled(%d,%d,%d,%d,%d);$%d. resettimer();$%d. pctimer(%d);$%d. linecolor(%s);$%d. sensor(%s);$%d. error(%d,%d);$%d. controller(%s,%s);$%d. ffspeed(%d,%d);$%d. bbspeed(%d,%d);$%d. linetrack(%d);$%d. motor(%d,%d,%d);$%d. line(%d,%d,%d,%d);$%d. linet(%d,%d,%d,%d,%d);$%d. timeline(%d,%d,%d,%d,%d);$%d. left(%d,%d);$%d. left1(%d,%d);$%d. left2(%d,%d);$%d. left3(%d,%d);$%d. left4(%d,%d);$%d. left5(%d,%d);$%d. left6(%d,%d);$%d. left7(%d,%d);$%d. right(%d,%d);$%d. right10(%d,%d);$%d. right9(%d,%d);$%d. right8(%d,%d);$%d. right7(%d,%d);$%d. right6(%d,%d);$%d. right5(%d,%d);$%d. right4(%d,%d);$%d. exline(%d,%d,%d,%d);$%d. exturn(%d,%d,%d,%d);$%d. linedelay(%d,%d,%d);$%d. linefind(%d,%d,%d);$%d. linedline(%d,%d,%d,%d,%d,%d);$%d. linetline(%d,%d,%d,%d,%d,%d);$%d. sline(%d,%d,%d);$%d. lostline(%d,%d,%d,%d);$F: %d%d%d%d%d %d%d%d%d%d$R: %d%d%d%d%d %d%d%d%d%d$%d%d%d%d%d%d%d%d%d%d$step %d$timespent: %d$Your Time: %s$line missing
+
+ */
+>>>>>>> dev
 struct StrFormat {
   uint32_t startAddress;
   uint8_t length;
 };
+<<<<<<< HEAD
 
 /*
  * Kirim ini di Serial Monitor
  */
 
+=======
+>>>>>>> dev
 const StrFormat MenuCalibNew{0,19}; // 1
 const StrFormat MenuCalibTest{19,20}; 
 const StrFormat MenuCalibSave{39,20}; 
@@ -115,7 +128,11 @@ void setup(){
       }
     }
     addrtmp += 0xFF;
+<<<<<<< HEAD
     Serial.print(F("To Addr: "));
+=======
+    Serial.print(F("To Addr: 0x"));
+>>>>>>> dev
     Serial.println(addrtmp, HEX); 
     Serial.println();
   }
@@ -126,7 +143,11 @@ void setup(){
 uint32_t address = 0;
 uint8_t i = 0;
 void loop(){
+<<<<<<< HEAD
   #ifdef READ_AND_STORE_EEPROM
+=======
+  #ifdef READ_AND_STORE_EPPROM
+>>>>>>> dev
 //  PROGRAM UNTUK MEMBACA SERIAL DAN MENYIMPANNYA MULAI DARI ALAMAT 0x00
   if(Serial.available()){
     char C = (char) Serial.read();
@@ -156,7 +177,11 @@ void loop(){
   Serial.println(getStringFormat(MenuFrontSensor));
   
   String data = getStringFormat(FuncBuzzerLed);
+<<<<<<< HEAD
   char info[data.length()] = {0};
+=======
+  char info[data.length() + 20] = {0};
+>>>>>>> dev
   sprintf(info, data.c_str(), 60, 1, 0, 1, 0, 1);
   
   Serial.print(data);
