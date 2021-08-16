@@ -307,10 +307,10 @@ void loop() {
       }
     }
   } else {
-    if(readBtn(0)){
+    if(readBtn(b0)){
       timing = millis();
       digitalWrite(l0, 1);
-      while(readBtn(0));
+      while(readBtn(b0));
       if((unsigned long) millis()-timing > 1000){
         flag = true;
       } else {
