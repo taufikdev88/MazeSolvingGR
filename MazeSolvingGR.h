@@ -1,14 +1,10 @@
 #ifndef MAZESOLVINGGR_H_
 #define MAZESOLVINGGR_H_
-
-#define ROBOT_NEW
-
 /*
  * Dependencies library
  */
 // #include <SPI.h>
 // #include <SD.h>
-
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306_STM32.h>
@@ -128,8 +124,13 @@ void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir
 void sline(uint8_t sensor, uint8_t speed, int16_t backBrakeTime);
 void lostline(uint16_t lostLineTime, uint8_t speed, uint16_t runTime, int16_t backBrakeTime);
 
-void turnAngle();
+void leftline(uint8_t speed, uint16_t runtime);
+void rightline(uint8_t speed, uint16_t runtime);
 
-void servo(int pin, uint16_t deg);
+void leftenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime);
+void rightenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime);
+
+void turnangle(int16_t angle);
+void servo(uint8_t pin, uint16_t deg);
 
 #endif
