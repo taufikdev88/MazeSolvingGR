@@ -1,10 +1,30 @@
 /*
- * Gudang Robot
+ *  Modul sensor berkomunikasi dengan kamera huskylens dan berkomunikasi dengan modul main board
+ *  Mainboard ke sensor:
+ *  1. A -> meminta data sensor
+ *  2. B -> set line color ke hitam (black)
+ *  3. W -> set line color ke putih (white)
+ *  4. T -> meminta jumlah sensor
+ *  5. Q -> meminta huskylens baca qrcode
+ *  6. C -> meminta huskylens baca warna
+ *  7. L -> meminta huskylens baca garis
  * 
- * TX RX 3.3 Gnd
- * 
+ *  Sensor ke Mainboard:
+ *  1. data sensor H0000000000T
+ *  2. tidak mengirim balasan untuk perintah B
+ *  3. tidak mengirim balasan untuk perintah W
+ *  4. H10T
+ *  5. HB255,255,255,255,255,1T jika mendapat data block
+ *     HA255,255,255,255,255,1T jika mendapat data arrow
+ *     N -> Object Warna/QrCode/Garis/Wajah ada tetapi tidak ada yang dikenali
+ *     F0 -> Huskylens tidak ready
+ *     F1 -> Koneksi dengan husky lens terputus
+ *     F2 -> Tidak ada pembelajaran sama sekali
+ *     F3 -> Tidak ada objek yang di deteksi
  */
+
 #include <Wire.h>
+#include "HUSKYLENS.h"
 
 #define s0 PB1
 #define s1 PB0
@@ -29,6 +49,60 @@ bool isBlackLine = true;
 
 unsigned long timing = 0;
 bool flag = false;
+bool huskyready = false;
+char huskymode = 'L'; // Q,C,L
+
+HUSKYLENS huskylens;
+
+/*
+ * Fungsi mengirim hasil dari Husky Lens ke board utama
+ */
+void printResult(HUSKYLENSResult result){
+  if(result.command == COMMAND_RETURN_BLOCK){
+    Serial3.print('H'); // head of packet
+    Serial3.print('B');
+    Serial3.print(result.xCenter); Serial3.print(',');
+    Serial3.print(result.yCenter); Serial3.print(',');
+    Serial3.print(result.width); Serial3.print(',');
+    Serial3.print(result.height); Serial3.print(',');
+    Serial3.print(result.ID); 
+    Serial3.print('T'); // tail of packet
+  } else if(result.command == COMMAND_RETURN_ARROW){
+    Serial3.print('H'); // head of packet
+    Serial3.print('A');
+    Serial3.print(result.xOrigin); Serial3.print(',');
+    Serial3.print(result.yOrigin); Serial3.print(',');
+    Serial3.print(result.xTarget); Serial3.print(',');
+    Serial3.print(result.yTarget); Serial3.print(',');
+    Serial3.print(result.ID);
+    Serial3.print('T'); // tail of packet
+  } else {
+    Serial3.print('N');
+  }
+}
+
+/*
+ * Fungsi ini dipanggil saat mainboard meminta membaca huskylens
+ */
+void readHuskyLens(){
+  if(huskyready){
+    if(!huskylens.request()) Serial3.print(F("F1"));
+    else if(!huskylens.isLearned()) Serial3.print(F("F2"));
+    else if(!huskylens.available()) Serial3.print(F("F3"));
+    else {
+      HUSKYLENSResult result = huskylens.read();
+      printResult(result);
+    }
+  } else {
+    if(huskylens.begin(Serial1)){
+      huskyready = true;
+      Serial3.print('N');
+    } else {
+      huskyready = false;
+      Serial3.print('F');
+    }
+  }
+}
 
 /*
  * Fungsi membaca tombol dengan sampling
@@ -139,7 +213,7 @@ void calibrateSensor(){
 //******************************** SETUP ********************************
 void setup(){
   Serial3.begin(115200);
-  Serial.begin(115200);
+  Serial1.begin(115200);
   Wire.begin();
   
   for(uint8_t i=0; i<sensorTotal; i++){
@@ -151,145 +225,54 @@ void setup(){
   pinMode(b1, INPUT_PULLUP);
   pinMode(l0, OUTPUT);
   digitalWrite(l0, 0);
+
+  if(!huskylens.begin(Serial1)){
+    huskyready = false;
+  } else {
+    huskyready = true;
+    huskymode = 'L';
+    huskylens.writeAlgorithm(ALGORITHM_LINE_TRACKING);
+  }
 }
 //******************************** LOOP  ********************************
 void loop() {
-  if(Serial.available()){
-    char cIn = Serial.read();
-
-    switch(cIn){
-      case 'A':
-      Serial.print(F("H"));
-      for(uint8_t i=0; i<sensorTotal; i++){
-        bool biggerThanThreshold = (getSensorValue(sPin[i]) < thSensor[i]);
-        if(isBlackLine) biggerThanThreshold = !biggerThanThreshold;
-          
-        Serial.print(biggerThanThreshold);
-      }
-      Serial.println('T');
-      break;
-      case '0':
-      Serial.println(getSensorValue(sPin[0]));
-      break;
-      case '1':
-      Serial.println(getSensorValue(sPin[1]));
-      break;
-      case '2':
-      Serial.println(getSensorValue(sPin[2]));
-      break;
-      case '3':
-      Serial.println(getSensorValue(sPin[3]));
-      break;
-      case '4':
-      Serial.println(getSensorValue(sPin[4]));
-      break;
-      case '5':
-      Serial.println(getSensorValue(sPin[5]));
-      break;
-      case '6':
-      Serial.println(getSensorValue(sPin[6]));
-      break;
-      case '7':
-      Serial.println(getSensorValue(sPin[7]));
-      break;
-      case '8':
-      Serial.println(getSensorValue(sPin[8]));
-      break;
-      case '9':
-      Serial.println(getSensorValue(sPin[9]));
-      break;
-      case 'Y':
-      Serial.print(F("H"));
-      for(uint8_t i=0; i<sensorTotal; i++){
-        Serial.print(getSensorValue(sPin[i], false));
-        Serial.print(',');
-      }
-      Serial.println('T');
-      break;
-      case 'Z':
-      Serial.print(F("H"));
-      for(uint8_t i=0; i<sensorTotal; i++){
-        Serial.print(getSensorValue(sPin[i]));
-        Serial.print(',');
-      }
-      Serial.println('T');
-      break;
-      case 'S':
-      for(uint8_t i=0; i<sensorTotal; i++){
-        saveValue(i, thSensor[i]);
-      }
-      Serial.print('D');
-      break;
-      case 'R':
-      for(uint8_t i=0; i<sensorTotal; i++){
-        Serial.print(readValue(i));
-        Serial.print(',');
-      }
-      Serial.println();
-      break;
-      case 'D':
-      for(uint8_t i=0; i<sensorTotal; i++){
-        Serial.print(thSensor[i]);
-        Serial.print(',');
-      }
-      Serial.println();
-      break;
-      case 'C':
-      calibrateSensor();
-      Serial.print('D');
-      break;
-      case 'B':
-      isBlackLine = true;
-      Serial.println("Line set to black");
-      break;
-      case 'W':
-      isBlackLine = false;
-      Serial.println("Line set to white");
-      break;
-      case 'T':
-      Serial.print(sensorTotal);
-      break;
-    }
-  }
-  
   if(Serial3.available()){
     char cIn = Serial3.read();
 
     switch(cIn){
       case 'A':
-      Serial.println("Read all sensor detection");
       Serial3.print(F("H"));
       for(uint8_t i=0; i<sensorTotal; i++){
         bool biggerThanThreshold = (getSensorValue(sPin[i]) < thSensor[i]);
         if(isBlackLine) biggerThanThreshold = !biggerThanThreshold;
-          
         Serial3.print(biggerThanThreshold);
-        Serial.print(biggerThanThreshold);
       }
-      Serial.println();
       Serial3.print('T');
       break;
-      case 'S':
-      Serial.println("Saving to EEPROM");
-      for(uint8_t i=0; i<sensorTotal; i++){
-        saveValue(i, thSensor[i]);
+      case 'B': isBlackLine = true; break;
+      case 'W': isBlackLine = false; break;
+      case 'T': Serial3.print('H'); Serial3.print(sensorTotal); Serial3.print('T'); break;
+      case 'H': readHuskyLens(); break;
+      case 'L': 
+      if(huskymode != 'L' && huskyready){
+        huskymode = 'L';
+        huskylens.writeAlgorithm(ALGORITHM_LINE_TRACKING);
       }
-      Serial3.print('D');
+      readHuskyLens();
+      break;
+      case 'Q':
+      if(huskymode != 'Q' && huskyready){
+        huskymode = 'Q';
+        huskylens.writeAlgorithm(ALGORITHM_TAG_RECOGNITION);
+      }
+      readHuskyLens();
       break;
       case 'C':
-      calibrateSensor();
-      Serial3.print('D');
-      break;
-      case 'B':
-      isBlackLine = true;
-      Serial.println("Line set to black");
-      break;
-      case 'W':
-      isBlackLine = false;
-      Serial.println("Line set to white");
-      break;
-      case 'T':
-      Serial3.print(sensorTotal);
+      if(huskymode != 'C' && huskyready){
+        huskymode = 'C';
+        huskylens.writeAlgorithm(ALGORITHM_COLOR_RECOGNITION);
+      }
+      readHuskyLens();
       break;
     }
   }
@@ -316,6 +299,8 @@ void loop() {
       } else {
         digitalWrite(l0, 0);
       }
+      delay(500);
+      Serial3.flush();
     }
   }
 }
