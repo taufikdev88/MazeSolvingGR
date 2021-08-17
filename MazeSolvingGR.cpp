@@ -202,18 +202,6 @@ int getRPMR(){
   return rpm;
 }
 
-void turnAngle()
-{
-  mpu6050.update();
-  yaw = mpu6050.getAngleZ();
-}
-
-void servo(int pin, uint16_t deg) // servo running control pin 0- 7 
-{
-  uint16_t pls = deg / 180.0 *450 + 150;
-  srv.setPWM(pin, 0, pls);
-}
-
 // ----------------------- fungsi independen / tidak bergantung ke fungsi yang lain -- posisi atas
 // fungsi pembacaan nilai dari sensor depan dan belakang termasuk dengan parsing dan menyimpan ke variable senData
 void readSensor(bool wichSensor){
@@ -480,7 +468,7 @@ void errorRaised(){
 // fungsi yang menjalankan motor sesuai PID untuk sensor garis
 void controllerRun(uint16_t line, int8_t speed, bool useError = true){
   int8_t error = 0;
-  int8_t pwm = 0;
+  int16_t pwm = 0;
   
   switch(line){
     // garis 2 sensor
@@ -605,10 +593,11 @@ void controllerRun(uint16_t line, int8_t speed, bool useError = true){
   }
 
   pwm = Kp*error + Kd*(error-dError);
+  pwm = constrain(pwm, -255, 255);
   dError = error;
 
-  int8_t s1 = speed+pwm;
-  int8_t s2 = speed-pwm;
+  int16_t s1 = speed+pwm;
+  int16_t s2 = speed-pwm;
   
   if(isTraceForward) motor_f(s1, s2, 0);
   else motor_f(-s2, -s1, 0);
@@ -1664,7 +1653,7 @@ void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir
 void sline(uint8_t sensor, uint8_t speed, int16_t backBrakeTime){
   if(isModeCount) return;
   ++nFunc;
-  if(mStep < nStep);
+  if(mStep < nStep) return;
 
   if(debug != no_debug){
     char d[getStringFormat(FuncSLine).length() + 15] = {0};
@@ -1715,7 +1704,7 @@ void sline(uint8_t sensor, uint8_t speed, int16_t backBrakeTime){
 void lostline(uint16_t lostLineTime, uint8_t speed, uint16_t runTime, int16_t backBrakeTime){
   if(isModeCount) return;
   ++nFunc;
-  if(mStep < nStep);
+  if(mStep < nStep) return;
 
   if(debug != no_debug){
     char d[getStringFormat(FuncLostLine).length() + 30] = {0};
@@ -1754,6 +1743,261 @@ void lostline(uint16_t lostLineTime, uint8_t speed, uint16_t runTime, int16_t ba
     digitalWrite(buzz, 0);
     digitalWrite(LED_BUILTIN, 0);
   }
+}
+
+void leftline(uint8_t speed, uint16_t runtime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+
+  unsigned long timeStart = millis();
+  while((unsigned long) millis()-timeStart <= runtime){
+    if(isTraceForward) readSensor(ff);
+    else readSensor(bb);
+
+    uint16_t line = 0x00;
+    senData2Bin(&line);
+
+    int8_t error = 0;
+    int16_t pwm = 0;
+
+    switch (line){
+      // sensor 2 garis data bagus
+      case 0b1000000000: error = -2; break;
+      case 0b1100000000: error = 0; break;
+      case 0b0100000000: error = 2; break;
+      case 0b0110000000: error = 5; break;
+      case 0b0010000000: error = 10; break;
+      case 0b0011000000: error = 12; break;
+      case 0b0001000000: error = 16; break;
+      case 0b0001100000: error = 19; break;
+      case 0b0000100000: error = 21; break;
+      case 0b0000110000: error = 24; break;
+      case 0b0000010000: error = 27; break;
+      case 0b0000011000: error = 30; break;
+      case 0b0000001000: error = 33; break;
+      case 0b0000001100: error = 36; break;
+      case 0b0000000100: error = 39; break;
+      case 0b0000000110: error = 42; break;
+      case 0b0000000010: error = 45; break;
+      case 0b0000000011: error = 48; break;
+      case 0b0000000001: error = 51; break;
+      case 0b0000000000: error = -10; break;
+      // sensor 3 garis data bagus
+      case 0b1110000000: error = 5; break;
+      case 0b0111000000: error = 7; break;
+      case 0b0011100000: error = 14; break;
+      case 0b0001110000: error = 21; break;
+      case 0b0000111000: error = 28; break;
+      case 0b0000011100: error = 35; break;
+      case 0b0000001110: error = 42; break;
+      case 0b0000000111: error = 49; break;
+      // sensor 4 garis data bagus
+      case 0b1111000000: error = 0; break;
+      case 0b0111100000: error = 9; break; 
+      case 0b0011110000: error = 18; break;
+      case 0b0001111000: error = 27; break;
+      case 0b0000111100: error = 36; break;
+      case 0b0000011110: error = 45; break;
+      case 0b0000001111: error = 54; break;
+      //  di tempat yg tepat tp sensor lain error
+      case 0b1100000001:
+      case 0b1100000010:
+      case 0b1100000100:
+      case 0b1100001000:
+      case 0b1100010000:
+      case 0b1100100000:
+      case 0b1101000000:
+
+      case 0b1101000001:
+      case 0b1100100001:
+      case 0b1100010001:
+      case 0b1100001001:
+      case 0b1101000010:
+      case 0b1100100010:
+      case 0b1100010010:
+      case 0b1100001010:
+      case 0b1101000100:
+      case 0b1100100100:
+      case 0b1100010100:
+      case 0b1101001000:
+      case 0b1100101000: error = 0; break;
+    }
+    
+    pwm = Kp*error + Kd*(error-dError);
+    pwm = constrain(pwm, -255, 255);
+    dError = error;
+
+    int16_t s1 = speed+pwm;
+    int16_t s2 = speed-pwm;
+    
+    if(isTraceForward) motor_f(s1, s2, 0);
+    else motor_f(-s2, -s1, 0);
+  }
+  motor_f(0,0,0);
+}
+
+void rightline(uint8_t speed, uint16_t runtime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+
+  unsigned long timeStart = millis();
+  while((unsigned long) millis()-timeStart <= runtime){
+    if(isTraceForward) readSensor(ff);
+    else readSensor(bb);
+
+    uint16_t line = 0x00;
+    senData2Bin(&line);
+
+    int8_t error = 0;
+    int16_t pwm = 0;
+
+    switch (line){
+      // sensor 2 garis data bagus
+      case 0b0000000000: error = 10; break;
+      case 0b1000000000: error = -51; break;
+      case 0b1100000000: error = -48; break;
+      case 0b0100000000: error = -45; break;
+      case 0b0110000000: error = -42; break;
+      case 0b0010000000: error = -39; break;
+      case 0b0011000000: error = -36; break;
+      case 0b0001000000: error = -33; break;
+      case 0b0001100000: error = -30; break;
+      case 0b0000100000: error = -27; break;
+      case 0b0000110000: error = -24; break;
+      case 0b0000010000: error = -21; break;
+      case 0b0000011000: error = -19; break;
+      case 0b0000001000: error = -16; break;
+      case 0b0000001100: error = -12; break;
+      case 0b0000000100: error = -10; break;
+      case 0b0000000110: error = -5; break;
+      case 0b0000000010: error =  -2; break;
+      case 0b0000000011: error = 0; break;
+      case 0b0000000001: error = 2; break;
+      // sensor 3 garis data bagus
+      case 0b1110000000: error = -49; break;
+      case 0b0111000000: error = -42; break;
+      case 0b0011100000: error = -35; break;
+      case 0b0001110000: error = -28; break;
+      case 0b0000111000: error = -21; break;
+      case 0b0000011100: error = -14; break;
+      case 0b0000001110: error = -7; break;
+      case 0b0000000111: error = -5; break;
+      // sensor 4 garis data bagus
+      case 0b1111000000: error = -54; break;
+      case 0b0111100000: error = -45; break; 
+      case 0b0011110000: error = -36; break;
+      case 0b0001111000: error = -27; break;
+      case 0b0000111100: error = -18; break;
+      case 0b0000011110: error = -9; break;
+      case 0b0000001111: error = 0; break;
+      //  di tempat yg tepat tp sensor lain error
+      case 0b1000000011:
+      case 0b0100000011:
+      case 0b0010000011:
+      case 0b0001000011:
+      case 0b0000100011:
+      case 0b0000010011:
+      case 0b0000001011:
+      case 0b1000001011:
+      case 0b1000010011:
+      case 0b1000100011:
+      case 0b1001000011:
+      case 0b0100001011:
+      case 0b0100010011:
+      case 0b0100100011:
+      case 0b0101000011:
+      case 0b0010001011:
+      case 0b0010010011:
+      case 0b0010100011:
+      case 0b0001001011:
+      case 0b0001010011: error = 0; break;
+    }
+    
+    pwm = Kp*error + Kd*(error-dError);
+    pwm = constrain(pwm, -255, 255);
+    dError = error;
+
+    int16_t s1 = speed+pwm;
+    int16_t s2 = speed-pwm;
+    
+    if(isTraceForward) motor_f(s1, s2, 0);
+    else motor_f(-s2, -s1, 0);
+  }
+  motor_f(0,0,0);
+}
+
+void turnenc(bool dir, uint8_t speed, uint16_t count, uint8_t backBrakeTime){
+  speed = constrain(speed, 0, 20);
+  counterR = 0;
+  counterL = 0;
+  
+  // turning
+  switch(dir){
+    case leftSide:
+    while(counterR < count) motor_f(-speed, speed, 0);
+    break;
+    case rightSide:
+    while(counterL < count) motor_f(speed, -speed, 0);
+    break;
+  }
+  // stop
+  motor_f(0,0,0);
+  if(isUseBuzzer){
+    digitalWrite(buzz, 1);
+    digitalWrite(LED_BUILTIN, 1); 
+  }
+  // reverse turning
+  unsigned long timeStart = millis();
+  while((unsigned long) millis()-timeStart<backBrakeTime){
+    switch(dir){
+      case leftSide:
+      motor_f(speed, -speed, 0);
+      break;
+      case rightSide:
+      motor_f(-speed, speed, 0);
+      break;
+    }
+  }
+  // stop
+  motor_f(0,0,0);
+  if(backBrakeTime == 0) delay(DELAY_BUZZER);
+  if(isUseBuzzer){
+    digitalWrite(buzz, 0);
+    digitalWrite(LED_BUILTIN, 0); 
+  }
+}
+void leftenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+
+  turnenc(leftSide, speed, count, backBrakeTime);
+}
+void rightenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+
+  turnenc(rightSide, speed, count, backBrakeTime);
+}
+
+void turnangle(int16_t angle){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+
+}
+
+void servo(uint8_t pin, uint16_t deg) // servo running control pin 0- 7 
+{
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+
+  uint16_t pls = deg / 180.0 *450 + 150;
+  srv.setPWM(pin, 0, pls);
 }
 /*************************************** akhir dari fungsi yang bisa dijalankan pengguna *******************************************/
 
