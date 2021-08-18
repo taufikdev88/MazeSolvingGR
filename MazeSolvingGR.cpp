@@ -203,12 +203,86 @@ int getRPMR(){
 }
 
 // ----------------------- fungsi independen / tidak bergantung ke fungsi yang lain -- posisi atas
+struct PacketHusky
+{
+  uint16_t xa = 0;
+  uint16_t xb = 0;
+  uint16_t ya = 0;
+  uint16_t yb = 0;
+  uint8_t id = 0;
+};
+
+PacketHusky readHusky(bool wichSensor, char mode){
+  HardwareSerial* os;
+  if(wichSensor == ff) os = &fsensor;
+  else os = &bsensor;
+
+  bool errorFlag = false;
+  PacketHusky packet;
+  uint8_t parsingIndex = 0;
+  uint8_t parsingCount = 0;
+  String parsingData = "";
+
+  os->write(mode);
+  while (os->available())
+  {
+    char c = (char) os->read();
+    if(parsingCount == 0){
+      if(c == 'H'){
+        errorFlag = false;
+      } else if(c == 'N'){
+        parsingCount = 0;
+        continue;
+      } else if(c == 'F'){
+        errorFlag = true;
+      } else {
+        parsingCount = 0;
+        continue;
+      }
+    } else if(parsingCount == 1){
+      if(errorFlag){
+        parsingCount = 0;
+        continue;
+      } 
+      parsingIndex = 0;
+      parsingData = "";
+    } else {
+      if(c == ',' || c == 'T'){
+        if(parsingIndex == 0) packet.xa = parsingData.toInt();
+        else if(parsingIndex == 1) packet.ya = parsingData.toInt();
+        else if(parsingIndex == 2) packet.xb = parsingData.toInt();
+        else if(parsingIndex == 3) packet.yb = parsingData.toInt();
+        else if(parsingIndex == 4) {
+          packet.id = parsingData.toInt();
+          parsingCount = 0;
+          continue;
+        }
+        parsingIndex++;
+        parsingData = "";
+      } else if(isDigit(c)){
+        parsingData += c;
+      } else {
+        packet.xa = 0;
+        packet.xb = 0;
+        packet.ya = 0;
+        packet.yb = 0;
+        packet.id = 0;
+        parsingCount = 0;
+        parsingData = "";
+        continue;
+      }
+    }
+    parsingCount++;
+  }
+  return packet;
+}
 // fungsi pembacaan nilai dari sensor depan dan belakang termasuk dengan parsing dan menyimpan ke variable senData
 void readSensor(bool wichSensor){
   HardwareSerial* os;
   bool temp[10] = { 0 };
   if(wichSensor == ff) os = &fsensor;
   else os = &bsensor;
+
   os->write('A');
   bool isSuccess = false;
   unsigned long timewait = millis();
@@ -423,9 +497,9 @@ void motor_f(int8_t leftSpeed, int8_t rightSpeed, uint16_t runTime = 0){
 void displayMenu(){
   display.clearDisplay();
   display.setCursor(0,0);
-  display.print(getStringFormat(MenuInfoMode)); display.println(runMode);
-  display.print(getStringFormat(MenuInfoStep)); display.println(nStep);
-  display.print(getStringFormat(MenuInfoDebug)); 
+  display.print(getStringFormat(MenuMode)); display.println(runMode);
+  display.print(getStringFormat(MenuStep)); display.println(nStep);
+  display.print(getStringFormat(MenuDebug)); 
   switch(debug){
     case no_debug: display.println(getStringFormat(InfoNoDebug)); break;
     case by_func: display.println(getStringFormat(InfoByFunc)); break;
@@ -1982,6 +2056,15 @@ void rightenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime){
 
   turnenc(rightSide, speed, count, backBrakeTime);
 }
+void motorcm(uint8_t speed, uint8_t cm, uint8_t backBrakeTime){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+
+  counterL = 0;
+  counterR = 0;
+
+}
 
 void turnangle(int16_t angle){
   if(isModeCount) return;
@@ -1998,6 +2081,82 @@ void servo(uint8_t pin, uint16_t deg) // servo running control pin 0- 7
 
   uint16_t pls = deg / 180.0 *450 + 150;
   srv.setPWM(pin, 0, pls);
+}
+
+void camlinetracking(bool whichSensor, uint8_t mode, uint8_t speed, int16_t brakeTime, uint16_t timeout){
+  if(isModeCount) return;
+  ++nFunc;
+  if(mStep < nStep) return;
+  
+  speed = constrain(speed, -20, 20);
+  brakeTime = constrain(brakeTime, -30000, 30000);
+  timeout = constrain(timeout, 0, 30000);
+
+  bool crossDetect = false;
+  PacketHusky packet;
+  unsigned long timeoutflag = millis();
+  while (!crossDetect){
+    packet = readHusky(whichSensor, 'L');
+
+    if(packet.id == 0){
+      if((unsigned long) millis()-timeoutflag >= timeout) break;
+      motor_f(0, 0, 0);
+      continue;
+    } 
+    timeoutflag = millis();
+    
+    // mode end fungsi ada disini
+
+    // linetracing menggunakan kamera
+    int16_t error = 160 - packet.xb;
+    int16_t pwm = Kp*error + Kd*(error-dError);
+    pwm = constrain(pwm, -255, 255);
+
+    int16_t s1 = speed + pwm;
+    int16_t s2 = speed - pwm;
+
+    if(isTraceForward) motor_f(s1, s2, 0);
+    else motor_f(-s2, -s1, 0);
+  }
+}
+
+uint8_t camdetectcolor(bool whichSensor, uint16_t timeout){
+  if(isModeCount) return 0;
+  ++nFunc;
+  if(mStep < nStep) return 0;
+
+  timeout = constrain(timeout, 0, 30000);
+
+  PacketHusky packet;
+  unsigned long timeoutflag = millis();
+  while (packet.id == 0){
+    if((unsigned long) millis()-timeoutflag > timeout) break;
+    packet = readHusky(whichSensor, 'C');
+  }
+  return packet.id;
+}
+
+uint8_t camdetectqrcode(bool whichSensor, uint16_t timeout){
+  if(isModeCount) return 0;
+  ++nFunc;
+  if(mStep < nStep) return 0;
+
+  timeout = constrain(timeout, 0, 30000);
+
+  PacketHusky packet;
+  unsigned long timeoutflag = millis();
+  while(packet.id == 0){
+    if((unsigned long) millis()-timeoutflag > timeout) break;
+    packet = readHusky(whichSensor, 'Q');
+  }
+  return packet.id;
+}
+
+void showonlcd(String data){
+  display.clearDisplay();
+  display.setCursor(0,0);
+  display.print(data);
+  display.display();
 }
 /*************************************** akhir dari fungsi yang bisa dijalankan pengguna *******************************************/
 
@@ -2130,5 +2289,5 @@ void setup(){
 }
 
 void loop(){
-
+  customloop();
 }

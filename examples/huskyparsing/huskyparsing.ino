@@ -21,15 +21,16 @@ void loop() {
     char c = (char) Serial2.read();
     
     if(i == 0){
-      errorFlag = false;
       if(c == 'H'){
 //        Serial.println(F("Mendapatkan data"));
         Serial.print(c);
+        errorFlag = false;
       } else
       if(c == 'N'){
 //        Serial.println(F("Tidak dikenali"));
         Serial.println(c);
         i = 0;
+        continue;
       } else
       if(c == 'F'){
 //        Serial.println(F("Error Flag aktif"));
@@ -39,6 +40,7 @@ void loop() {
 //        Serial.println(F("Data error"));
         Serial.println(c);
         i = 0;
+        continue;
       }
     } else
     if(i == 1){
@@ -48,14 +50,15 @@ void loop() {
 //        else if(c == '1') Serial.println(F("Koneksi husky lens terputus"));
 //        else if(c == '2') Serial.println(F("Perlu learning"));
 //        else if(c == '3') Serial.println(F("Tidak ada objek terdeteksi"));
-        
         i = 0;
+        continue;
       } else {
 //        if(c == 'A') Serial.println(F("Data arrow didapat"));
 //        else if(c == 'B') Serial.println(F("Data block didapat"));
         Serial.print(c);
       }
       index = 0;
+      data = "";
     } else {
       if(c == ',' || c == 'T'){
         Serial.print(c);
@@ -67,6 +70,7 @@ void loop() {
           id = data.toInt();
           Serial.println((String) "   xa:" + xa + ", ya:" + ya + ", xb:" + xb + ", yb:" + yb + ", id:" + id);
           i = 0;
+          continue;
         }
         index++;
         data = "";
@@ -78,10 +82,11 @@ void loop() {
         Serial.println(F(" CORRUPT"));
         xa = xb = ya = yb = id = 0;
         data = "";
+        i = 0;
+        continue;
       }
     }
     i++;
   }
-
   delay(100);
 }

@@ -61,6 +61,7 @@ void initMazeRobot();
 void mode1();
 void mode2();
 void mode3();
+void customloop();
 
 /*
  * Stock functions
@@ -129,8 +130,13 @@ void rightline(uint8_t speed, uint16_t runtime);
 
 void leftenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime);
 void rightenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime);
+void motorcm(uint8_t speed, uint8_t cm, uint8_t backBrakeTime);
 
 void turnangle(int16_t angle);
 void servo(uint8_t pin, uint16_t deg);
 
+void camlinetracking(bool whichSensor, uint8_t mode, uint8_t speed, int16_t brakeTime, uint16_t timeout); // pending
+uint8_t camdetectcolor(bool whichSensor, uint16_t timeout);
+uint8_t camdetectqrcode(bool whichSensor, uint16_t timeout); // pending
+void showonlcd(String data);
 #endif
