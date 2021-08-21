@@ -144,11 +144,15 @@ void exline(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int
 void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime);
 
 void servo(uint8_t pin, uint16_t deg);
-void pick(uint16_t timedelay);
-void place(uint16_t timedelay);
+void pickdn(uint16_t timedelay);
+void placedn(uint16_t timedelay);
+void pickup(uint16_t timedelay);
+void placeup(uint16_t timedelay);
+void take(uint16_t timedelay);
+void put(uint16_t timedelay);
 void camright(uint16_t timedelay);
 void camfront(uint16_t timedelay);
-void camrear(uint16_t timedelay);
+void camleft(uint16_t timedelay);
 
 uint8_t camdetectcolor(bool whichSensor, uint16_t timeout);
 void showonlcd(String data);
