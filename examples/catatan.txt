@@ -13,7 +13,7 @@ yang perlu dicoba dan dipastikan kembali
 12. tes fungsi left1 - left7 sampai leftenc
 13. tes fungsi right10 - right4 sampai rightenc
 14.** exline dan exturn di tes diakhir saja
-15. cari kombinasi sudut dan pin servo untuk fungsi pick, place, camfront, camright, camrear
+15. cari kombinasi sudut dan pin servo untuk fungsi pick, place, camfront, camright, camrear (ganti fungsi pickup, placeup, pickdn, placedn, take, put, camfornt, camright, camleft) //fix
 16. tes fungsi motorsideavoider
 
 fungsi utama robot

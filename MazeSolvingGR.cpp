@@ -1965,20 +1965,68 @@ void servo(uint8_t pin, uint16_t deg)
   uint16_t pulse = deg / 180.0 * 450 + 150;
   srv.setPWM(pin, 0, pulse);
 }
-void pick(uint16_t timedelay)
+void pickup(uint16_t timedelay)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
-  servo(5,0); // sesuaikan
+  servo(6,120); // sesuaikan
   useBuzzerOn();
   delay(timedelay);
   useBuzzerOff();
 }
-void place(uint16_t timedelay)
+void placeup(uint16_t timedelay)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
-  servo(5,0); // sesuaikan
+  servo(7,160); // sesuaikan
+  useBuzzerOn();
+  delay(timedelay);
+  useBuzzerOff();
+}
+void pickdn(uint16_t timedelay)
+{
+  if (iMC) return; nFunc++; if(mStep < nStep) return;
+  if (debugMode == by_func) waitKey4();
+  servo(6,60); // sesuaikan
+  useBuzzerOn();
+  delay(timedelay);
+  useBuzzerOff();
+}
+void placedn(uint16_t timedelay)
+{
+  if (iMC) return; nFunc++; if(mStep < nStep) return;
+  if (debugMode == by_func) waitKey4();
+  servo(7,90); // sesuaikan
+  useBuzzerOn();
+  delay(timedelay);
+  useBuzzerOff();
+}
+void take(uint16_t timedelay)
+{
+  if (iMC) return; nFunc++; if(mStep < nStep) return;
+  if (debugMode == by_func) waitKey4();
+  servo(6,60); // sesuaikan
+  delay(timedelay);
+  servo(7,90);
+  delay(timedelay);
+  servo(6,120);
+  delay(timedelay);
+  servo(7,160);
+  useBuzzerOn();
+  delay(timedelay);
+  useBuzzerOff();
+}
+void put(uint16_t timedelay)
+{
+  if (iMC) return; nFunc++; if(mStep < nStep) return;
+  if (debugMode == by_func) waitKey4();
+  servo(7,90); // sesuaikan
+  delay(timedelay);
+  servo(6,60);
+  delay(timedelay);
+  servo(7,160);
+  delay(timedelay);
+  servo(6,120);
   useBuzzerOn();
   delay(timedelay);
   useBuzzerOff();
@@ -1987,7 +2035,7 @@ void camright(uint16_t timedelay)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
-  servo(5,0); // sesuaikan
+  servo(5,25); // sesuaikan
   useBuzzerOn();
   delay(timedelay);
   useBuzzerOff();
@@ -1996,16 +2044,16 @@ void camfront(uint16_t timedelay)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
-  servo(5,0); // sesuaikan
+  servo(5,123); // sesuaikan
   useBuzzerOn();
   delay(timedelay);
   useBuzzerOff();
 }
-void camrear(uint16_t timedelay)
+void camleft(uint16_t timedelay)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
-  servo(5,0); // sesuaikan
+  servo(5,210); // sesuaikan
   useBuzzerOn();
   delay(timedelay);
   useBuzzerOff();
