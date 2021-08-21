@@ -3,8 +3,6 @@
 /*
  * Dependencies library
  */
-// #include <SPI.h>
-// #include <SD.h>
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306_STM32.h>
@@ -28,8 +26,8 @@
 #define tt1 4
 #define tt2 5
 #define tt3 6
-#define pp pp0
-#define tt tt2
+#define pp  pp0
+#define tt  tt2
 // after crossing mode
 // ff -> robot stop after passing crosslines
 #define fl 2 // robot stop after passing cross line on the left
@@ -40,17 +38,16 @@
 #define sl 7 // robot stop upon sensing cross line on the left
 #define sr 8 // robot stop upon sensing cross line on the right
 // sensor define
-#define sensor1 512
-#define sensor2 256
-#define sensor3 128
-#define sensor4 64
-#define sensor5 32
-#define sensor6 16
-#define sensor7 8
-#define sensor8 4
-#define sensor9 2
-#define sensor10 1
-
+#define sensor1   512
+#define sensor2   256
+#define sensor3   128
+#define sensor4   64
+#define sensor5   32
+#define sensor6   16
+#define sensor7   8
+#define sensor8   4
+#define sensor9   2
+#define sensor10  1
 
 /*
  * Defined function
@@ -78,65 +75,82 @@ void linecolor(bool color);
 void sensor(bool dir);
 void error(bool useError, uint16_t time);
 void controller(float customKp, float customKd);
-#define pid1() controller(1.0,10.0);
-#define pid2() controller(1.0,20.0);
-#define pid3() controller(1.0,30.0);
-#define pid4() controller(2.0,20.0);
-#define pid5() controller(2.0,40.0);
-#define pid6() controller(2.0,60.0);
-#define pid7() controller(3.0,30.0);
+void motorController(float customKp, float customKi, float customKd);
+
+#define pid1() controller(1.0,10.0)
+#define pid2() controller(1.0,20.0)
+#define pid3() controller(1.0,30.0)
+#define pid4() controller(2.0,20.0)
+#define pid5() controller(2.0,40.0)
+#define pid6() controller(2.0,60.0)
+#define pid7() controller(3.0,30.0)
+#define motorPid1() motorController(1.0,0.01,1.0)
+#define motorPid2() motorController(1.0,0.02,2.0)
+#define motorPid3() motorController(1.0,0.03,3.0)
+#define motorPid4() motorController(2.0,0.01,1.0)
+#define motorPid5() motorController(2.0,0.02,2.0)
+#define motorPid6() motorController(2.0,0.03,3.0)
+#define motorPid7() motorController(3.0,0.01,1.0)
+
 void step();
 void setstepdelay(uint16_t time);
 
 void ffspeed(uint8_t l, uint8_t r);
 void bbspeed(uint8_t l, uint8_t r);
 
-void motor(int8_t leftSpeed, int8_t rightSpeed, uint16_t runTime);
-void line(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime);
-void linet(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime, uint16_t actionTime);
-void timeline(uint8_t method, uint8_t dir, uint8_t speed, int16_t brakeTime, uint16_t totalActionTime);
+void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime);
+void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
+void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime);
+void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
 
-void left(uint8_t speed, uint8_t backBrakeTime);
-void left1(uint8_t speed, uint8_t backBrakeTime);
-void left2(uint8_t speed, uint8_t backBrakeTime);
-void left3(uint8_t speed, uint8_t backBrakeTime);
-void left4(uint8_t speed, uint8_t backBrakeTime);
-void left5(uint8_t speed, uint8_t backBrakeTime);
-void left6(uint8_t speed, uint8_t backBrakeTime);
-void left7(uint8_t speed, uint8_t backBrakeTime);
+void line(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime);
+void linet(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime);
+void timeline(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t totalActionTime);
 
-void right(uint8_t speed, uint8_t backBrakeTime);
-void right10(uint8_t speed, uint8_t backBrakeTime);
-void right9(uint8_t speed, uint8_t backBrakeTime);
-void right8(uint8_t speed, uint8_t backBrakeTime);
-void right7(uint8_t speed, uint8_t backBrakeTime);
-void right6(uint8_t speed, uint8_t backBrakeTime);
-void right5(uint8_t speed, uint8_t backBrakeTime);
-void right4(uint8_t speed, uint8_t backBrakeTime);
-
-void exline(int8_t leftMotorSpeed, int8_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime);
-void exturn(int8_t leftMotorSpeed, int8_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime);
-
-void linedelay(uint8_t speed, uint16_t runTime, int16_t backBrakeTime);
-void linefind(int8_t leftSpeed, int8_t rightSpeed, uint16_t timeToDisregardLine);
-void linedline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t brakeTime);
+void linedelay(int16_t speed, uint16_t runTime, int16_t backBrakeTime);
+void linefind(int16_t leftSpeed, int16_t rightSpeed, uint16_t timeToDisregardLine);
+void linedline(uint16_t runTime, uint16_t startSpeed, uint16_t method, uint16_t dir, uint16_t endSpeed, int16_t brakeTime);
 void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t brakeTime);
 
-void sline(uint8_t sensor, uint8_t speed, int16_t backBrakeTime);
-void lostline(uint16_t lostLineTime, uint8_t speed, uint16_t runTime, int16_t backBrakeTime);
+void sline(uint8_t sensor, int16_t speed, int16_t backBrakeTime);
+void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t backBrakeTime);
 
-void leftline(uint8_t speed, uint16_t runtime);
-void rightline(uint8_t speed, uint16_t runtime);
+void leftline(int16_t speed, uint16_t runtime, bool supermode = false);
+void rightline(int16_t speed, uint16_t runtime, bool supermode = false);
 
-void leftenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime);
-void rightenc(uint8_t speed, uint16_t count, uint8_t backBrakeTime);
-void motorcm(uint8_t speed, uint8_t cm, uint8_t backBrakeTime);
+void left(int16_t speed, uint16_t backBrakeTime);
+void left1(int16_t speed, uint16_t backBrakeTime);
+void left2(int16_t speed, uint16_t backBrakeTime);
+void left3(int16_t speed, uint16_t backBrakeTime);
+void left4(int16_t speed, uint16_t backBrakeTime);
+void left5(int16_t speed, uint16_t backBrakeTime);
+void left6(int16_t speed, uint16_t backBrakeTime);
+void left7(int16_t speed, uint16_t backBrakeTime);
+void leftenc(int16_t speed, uint16_t count, uint16_t backBrakeTime);
+
+void right(int16_t speed, uint16_t backBrakeTime);
+void right10(int16_t speed, uint16_t backBrakeTime);
+void right9(int16_t speed, uint16_t backBrakeTime);
+void right8(int16_t speed, uint16_t backBrakeTime);
+void right7(int16_t speed, uint16_t backBrakeTime);
+void right6(int16_t speed, uint16_t backBrakeTime);
+void right5(int16_t speed, uint16_t backBrakeTime);
+void right4(int16_t speed, uint16_t backBrakeTime);
+void rightenc(int16_t speed, uint16_t count, uint16_t backBrakeTime);
 
 void turnangle(int16_t angle);
-void servo(uint8_t pin, uint16_t deg);
 
-void camlinetracking(bool whichSensor, uint8_t mode, uint8_t speed, int16_t brakeTime, uint16_t timeout); // pending
+void exline(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime);
+void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime);
+
+void servo(uint8_t pin, uint16_t deg);
+void pick(uint16_t timedelay);
+void place(uint16_t timedelay);
+void camright(uint16_t timedelay);
+void camfront(uint16_t timedelay);
+void camrear(uint16_t timedelay);
+
 uint8_t camdetectcolor(bool whichSensor, uint16_t timeout);
-uint8_t camdetectqrcode(bool whichSensor, uint16_t timeout); // pending
 void showonlcd(String data);
+
 #endif
