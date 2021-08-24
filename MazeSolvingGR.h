@@ -151,6 +151,7 @@ void camfront(uint16_t timedelay);
 void camrear(uint16_t timedelay);
 
 uint8_t camdetectcolor(bool whichSensor, uint16_t timeout);
+String raspidetectqr(bool whichSensor, uint16_t timeout);
 void showonlcd(String data);
 
 #endif
