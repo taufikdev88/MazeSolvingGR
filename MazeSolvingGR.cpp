@@ -158,6 +158,14 @@ struct PacketHusky
   uint16_t yb = 0;
   uint8_t id = 0;
 };
+struct PacketRaspi 
+{
+  uint16_t x = 0;
+  uint16_t y = 0;
+  uint16_t w = 0;
+  uint16_t h = 0;
+  String data = "";
+};
 
 MPU6050 mpu6050(Wire);
 Adafruit_PWMServoDriver srv = Adafruit_PWMServoDriver();
@@ -295,6 +303,86 @@ PacketHusky readHusky(bool ws, char md)
       }
     }
     pcnt++;
+  }
+  return p;
+}
+PacketRaspi readRaspi(bool ws)
+{
+  HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
+  PacketRaspi p;
+  uint8_t pidx = 0;
+  uint8_t pcnt = 0;
+  String pstr = "";
+  os->write('R');
+  unsigned long timestart = millis();
+  bool rto = false;
+  while (!os->available())
+  {
+    if ((unsigned long) millis()-timestart > 1100) 
+    {
+      rto = true;
+      break;
+    }
+  }
+  if (rto) return p;
+  while (os->available())
+  {
+    char c = (char) os->read();
+    if (pcnt == 0)
+    {
+      if (c != 'H')
+      {
+        pcnt = 0;
+        continue;
+      }
+      pstr = "";
+    }
+    else
+    {
+      if (c == ',' || c == 'T')
+      {
+        if (pidx == 0)
+        {
+          p.x = pstr.toInt();
+        }
+        else if (pidx == 1)
+        {
+          p.y = pstr.toInt();
+        }
+        else if (pidx == 2)
+        {
+          p.w = pstr.toInt();
+        }
+        else if (pidx == 3)
+        {
+          p.h = pstr.toInt();
+        }
+        else if (pidx == 4)
+        {
+          p.data = pstr;
+          pcnt = 0;
+          continue;
+        }
+        pidx++;
+        pstr = "";
+      }
+      else 
+      {
+        if (pidx < 4 && !isDigit(c))
+        {
+          p.x = 0;
+          p.y = 0;
+          p.w = 0;
+          p.h = 0;
+          p.data = "";
+          pcnt = 0;
+          continue;
+        }
+        pstr += c;
+      }
+    }
+    pcnt++;
+    delay(1);
   }
   return p;
 }
@@ -2010,18 +2098,23 @@ void camrear(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
-uint8_t camdetectcolor(bool whichSensor, uint16_t timeout)
+uint8_t camdetectcolor(bool whichSensor, uint16_t timeout = 1000)
 {
   if (iMC) return 0; nFunc++; if(mStep < nStep) return 0;
   if (debugMode == by_func) waitKey4();
   PacketHusky packet;
   unsigned long timeStart = millis();
-  while (packet.id == 0)
-  {
-    if ((unsigned long) millis()-timeStart > timeout) break;
-    packet = readHusky(ff, 'C');
-  }
+  packet = readHusky(whichSensor, 'C');
   return packet.id;
+}
+String raspidetectqr(bool whichSensor, uint16_t timeout = 1200){
+  if (iMC) return ""; nFunc++; if(mStep < nStep) return "";
+  if (debugMode == by_func) waitKey4();
+
+  PacketRaspi packet;
+  unsigned long timeStart = millis();
+  packet = readRaspi(whichSensor);
+  return packet.data;
 }
 void showonlcd(String data)
 {

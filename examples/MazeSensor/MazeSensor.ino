@@ -105,6 +105,33 @@ void readHuskyLens(){
 }
 
 /*
+ * Fungsi ini dipanggil saat mainboard meminta membaca qrcode dari raspberry pi
+ */
+void readRaspberrypi(){
+  Serial1.print("r");
+  unsigned long timeStart = millis();
+  bool timeout = false;
+  while (!Serial1.available())
+  {
+    if((unsigned long) millis()-timeStart > 1000){
+      timeout = true;
+      break;
+    }
+  }
+  if(timeout){
+    Serial3.print('N');
+    return;
+  }
+  String temp = "";
+  while (Serial1.available())
+  {
+    char c = (char) Serial1.read();
+    temp += c;
+  }
+  Serial3.print(data);
+}
+
+/*
  * Fungsi membaca tombol dengan sampling
  */
 bool readBtn(uint8_t pin){
@@ -273,6 +300,9 @@ void loop() {
         huskylens.writeAlgorithm(ALGORITHM_COLOR_RECOGNITION);
       }
       readHuskyLens();
+      break;
+      case 'R':
+      readRaspberrypi();
       break;
     }
   }
