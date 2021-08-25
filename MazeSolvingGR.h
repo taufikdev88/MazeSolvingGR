@@ -84,13 +84,13 @@ void motorController(float customKp, float customKi, float customKd);
 #define pid5() controller(2.0,40.0)
 #define pid6() controller(2.0,60.0)
 #define pid7() controller(3.0,30.0)
-#define motorPid1() motorController(1.0,0.01,1.0)
-#define motorPid2() motorController(1.0,0.02,2.0)
-#define motorPid3() motorController(1.0,0.03,3.0)
-#define motorPid4() motorController(2.0,0.01,1.0)
-#define motorPid5() motorController(2.0,0.02,2.0)
-#define motorPid6() motorController(2.0,0.03,3.0)
-#define motorPid7() motorController(3.0,0.01,1.0)
+#define motorPid1() motorController(0.10,0.005,0.01)
+#define motorPid2() motorController(0.11,0.002,0.01)
+#define motorPid3() motorController(0.09,0.003,0.01)
+#define motorPid4() motorController(0.08,0.001,0.01)
+#define motorPid5() motorController(0.07,0.002,0.01)
+#define motorPid6() motorController(0.06,0.003,0.01)
+#define motorPid7() motorController(0.05,0.001,0.01)
 
 void step();
 void setstepdelay(uint16_t time);
@@ -101,7 +101,10 @@ void bbspeed(uint8_t l, uint8_t r);
 void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime);
 void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
 void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime);
-void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
+int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime, bool avoidActive, int8_t colorId);
+
+void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime); // belum
+void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t threshold); // belum
 
 void line(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime);
 void linet(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime);
@@ -154,8 +157,8 @@ void camright(uint16_t timedelay);
 void camfront(uint16_t timedelay);
 void camleft(uint16_t timedelay);
 
-uint8_t camdetectcolor(bool whichSensor, uint16_t timeout);
-String raspidetectqr(bool whichSensor, uint16_t timeout);
+uint8_t camdetectcolor(bool whichSensor);
+String raspidetectqr(bool whichSensor);
 void showonlcd(String data);
 
 #endif
