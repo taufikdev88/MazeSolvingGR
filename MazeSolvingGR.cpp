@@ -106,6 +106,7 @@ const StrFormat InfoLineMissing{1285,12};
 #define delaybutton 200
 #define fsensor Serial1
 #define rsensor Serial2
+#define imuserial Serial3
 #define none -1
 #define leftSide 0
 #define rightSide 1
@@ -146,7 +147,7 @@ uint8_t rightPwmOffsetFwd = 0;
 uint8_t leftPwmOffsetBwd = 0; 
 uint8_t rightPwmOffsetBwd = 0; 
 
-float robotHeading = 0;
+float heading = 0;
 
 bool senData[10] = {0};
 String mazeLog[2];
@@ -156,7 +157,7 @@ struct PacketHusky
   uint16_t xb = 0;
   uint16_t ya = 0;
   uint16_t yb = 0;
-  uint8_t id = 0;
+  int8_t id = 0;
 };
 struct PacketRaspi 
 {
@@ -183,19 +184,21 @@ void pulseCountR()
 {
   counterR++;
 }
-int getRPML()
+float getRPML()
 {
   detachInterrupt(digitalPinToInterrupt(PA0));
-  int rpm = 60*1000 / (millis()-lastTimeL)*counterL;
+  unsigned long dtime = ((unsigned long) millis()-lastTimeL);
+  float rpm = (counterL / 214.0) * (60000.0 / dtime);
   lastTimeL = millis();
   counterL = 0;
   attachInterrupt(digitalPinToInterrupt(PA0),pulseCountL,RISING);
   return rpm;
 }
-int getRPMR()
+float getRPMR()
 {
   detachInterrupt(digitalPinToInterrupt(PA1));
-  int rpm = 60*1000 / (millis()-lastTimeR)*counterR;
+  unsigned long dtime = ((unsigned long) millis()-lastTimeR);
+  float rpm = (counterR / 214.0) * (60000.0 / dtime);
   lastTimeR = millis();
   counterR = 0;
   attachInterrupt(digitalPinToInterrupt(PA1),pulseCountR,RISING);
@@ -203,6 +206,9 @@ int getRPMR()
 }
 // **********************************************************************************************
 // *************************************************************** communicate with sensor module
+void imusense(){
+
+}
 PacketHusky readHusky(bool ws, char md)
 {
   HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
@@ -385,6 +391,17 @@ PacketRaspi readRaspi(bool ws)
     delay(1);
   }
   return p;
+}
+void cleanSensor()
+{
+  while (fsensor.available())
+  {
+    fsensor.read();
+  }
+  while (rsensor.available())
+  {
+    rsensor.read();
+  }
 }
 void readSensor(bool ws)
 {
@@ -657,6 +674,7 @@ void kinematik(int16_t ls, int16_t rs)
 }
 void errorRaised()
 {
+  kinematik(0,0);
   while (1)
   {
     kinematik(0,0);
@@ -780,7 +798,9 @@ void controllerRun(uint16_t line, int16_t speed, bool useError = true)
   
   if (useError && iED && iUE && (unsigned long) millis()-errorStart >= maxErrorTime)
   {
+    kinematik(0,0);
     errorRaised();
+    return;
   }
   
   pwm = Kp * e + Kd * (e - dError);
@@ -790,7 +810,7 @@ void controllerRun(uint16_t line, int16_t speed, bool useError = true)
   int16_t spdr = speed - pwm;
   kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
 }
-void backBrakeTimeFunc(int16_t speed, int16_t brakeTime)
+void backBrakeTimeFunc(int16_t speed, int16_t brakeTime, bool useError = true)
 {
   unsigned long timeStart = millis();
   while ((unsigned long) millis()-timeStart < brakeTime)
@@ -803,7 +823,7 @@ void backBrakeTimeFunc(int16_t speed, int16_t brakeTime)
     readSensor(iTF ? ff : bb);
     uint16_t l = 0x00;
     senData2Bin(&l);
-    controllerRun(l, speed);
+    controllerRun(l, speed, useError);
   }
   kinematik(0,0);
 }
@@ -1043,6 +1063,7 @@ void linetFunc(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, ui
 void linedelayFunc(int16_t speed, uint16_t runTime, int16_t brakeTime)
 {
   unsigned long timeStart = millis();
+  cleanSensor();
   while ((unsigned long) millis()-timeStart < runTime)
   {
     readSensor(iTF ? ff : bb);
@@ -1274,6 +1295,9 @@ void error(bool useError, uint16_t time)
 }
 void controller(float customKp, float customKd)
 {
+  Kp = constrain(customKp, 0.0, 100.0);
+  Kd = constrain(customKd, 0.0, 100.0);
+
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
   if(debugMode != no_debug){
@@ -1285,16 +1309,15 @@ void controller(float customKp, float customKd)
     sprintf(d,getStringFormat(FuncController).c_str(),nFunc,p1,p2);
     log(d);
   }
-  Kp = constrain(customKp, 0.0, 100.0);
-  Kd = constrain(customKd, 0.0, 100.0);
 }
 void motorController(float customKp, float customKi, float customKd)
 {
-  if (iMC) return; nFunc++; if(mStep < nStep) return;
-  if (debugMode == by_func) waitKey4();
   KpMotor = customKp;
   KiMotor = customKi;
   KdMotor = customKd;
+
+  if (iMC) return; nFunc++; if(mStep < nStep) return;
+  if (debugMode == by_func) waitKey4();
 }
 void step()
 {
@@ -1365,37 +1388,225 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
+
   int16_t spdl = 0;
   int16_t spdr = 0;
-  unsigned long timeStart = millis();
   float iErrorL = 0;
   float iErrorR = 0;
   float dErrorL = 0;
   float dErrorR = 0;
+
+  cleanSensor();
+  unsigned long timeStart = millis();
   while ((unsigned long) millis()-timeStart < runTime)
   {
-    int16_t lError = rpmSpeed - getRPML();
-    int16_t rError = rpmSpeed - getRPMR();
-    int16_t outL = KpMotor * lError + KiMotor * iErrorL + KdMotor * (iErrorL - dErrorL);
-    int16_t outR = KpMotor * rError + KiMotor * iErrorR + KdMotor * (iErrorR - dErrorR);
+    float rpmL = getRPML();
+    float rpmR = getRPMR();
+
+    float lError = rpmSpeed - rpmL;
+    float rError = rpmSpeed - rpmR;
+
+    float outL = KpMotor * lError + KiMotor * iErrorL + KdMotor * (lError - dErrorL);
+    float outR = KpMotor * rError + KiMotor * iErrorR + KdMotor * (rError - dErrorR);
+
     iErrorL += lError;
     iErrorR += rError;
+
     iErrorL = constrain(iErrorL, -400, 400);
     iErrorR = constrain(iErrorR, -400, 400);
+
     dErrorL = lError;
     dErrorR = rError;
+
     spdl += outL;
     spdr += outR;
+    spdl = constrain(spdl, -255, 255);
+    spdr = constrain(spdr, -255, 255);
+    
+    readSensor(iTF ? ff : bb);
+    uint16_t line = 0;
+    senData2Bin(&line);
+    bool center = false;
+    switch (line)
+    {
+    case 0b1000000000: spdr = 35; break;
+    case 0b1100000000: spdr = 30; break;
+    case 0b0100000000: spdr = 25; break;
+    case 0b0110000000: spdr = 20; break;
+    case 0b0010000000: spdr = 15; break;
+    case 0b0011000000: spdr = 10; break;
+    case 0b0001000000: spdr = 5; break;
+    case 0b0001100000: spdr = 0; center = true; break;
+    case 0b0000100000: spdr = 0; center = true; break;
+    case 0b0000010000: spdl = 0; center = true; break;
+    case 0b0000011000: spdl = 0; center = true; break;
+    case 0b0000001000: spdl = 5; break;
+    case 0b0000001100: spdl = 10; break;
+    case 0b0000000100: spdl = 15; break;
+    case 0b0000000110: spdl = 20; break;
+    case 0b0000000010: spdl = 25; break;
+    case 0b0000000011: spdl = 30; break;
+    case 0b0000000001: spdl = 35; break;
+    case 0b0000110000:
+    case 0b0001110000:
+    case 0b0000111000: 
+    case 0b0001111000:
+    case 0b0011110000:
+    case 0b0000111100:
+    case 0b0011111100:
+    case 0b0111111000:
+    case 0b0001111110:
+    case 0b0111111110:
+    case 0b0000011111:
+    case 0b0000111111:
+    case 0b0001111111:
+    case 0b0011111111:
+    case 0b0111111111:
+    case 0b1111111111: center = true; break;
+    }
+    if (center)
+    {
+      kinematik(0,0);
+      break;
+    }
+    // showonlcd((String) "rpm: " + rpmL + "  " + rpmR + "\nspd: " + spdl + "  " + spdr);
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
+    delay(10);
   }
-  useBuzzerOn();
-  backBrakeTimeFunc(150, backBrakeTime);
-  useBuzzerOn();
+  kinematik(0,0);
+}
+int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime, bool avoidActive, int8_t colorId)
+{
+  if (iMC) return 0; nFunc++; if(mStep < nStep) return 0;
+  if (debugMode == by_func) waitKey4();
+
+  int16_t spdl = 0;
+  int16_t spdr = 0;
+  float iErrorL = 0;
+  float iErrorR = 0;
+  float dErrorL = 0;
+  float dErrorR = 0;
+  PacketHusky packet;
+
+  cleanSensor();
+  int8_t colordetected = 0;
+  unsigned long timeStart = millis();
+  while ((unsigned long) millis()-timeStart < runTime)
+  {
+    packet = readHusky(bb, 'C');
+    if (packet.id != 0)
+    {
+      if (colorId == 0)
+      {
+        colordetected = packet.id;
+        break;
+      }
+      else
+      {
+        if (packet.id == colorId)
+        {
+          colordetected = packet.id;
+          break;
+        }
+      }
+    }
+
+    float rpmL = getRPML();
+    float rpmR = getRPMR();
+
+    float lError = rpmSpeed - rpmL;
+    float rError = rpmSpeed - rpmR;
+
+    float outL = KpMotor * lError + KiMotor * iErrorL + KdMotor * (lError - dErrorL);
+    float outR = KpMotor * rError + KiMotor * iErrorR + KdMotor * (rError - dErrorR);
+
+    iErrorL += lError;
+    iErrorR += rError;
+
+    iErrorL = constrain(iErrorL, -400, 400);
+    iErrorR = constrain(iErrorR, -400, 400);
+
+    dErrorL = lError;
+    dErrorR = rError;
+
+    spdl += outL;
+    spdr += outR;
+    
+    readSensor(iTF ? ff : bb);
+    uint16_t line = 0;
+    senData2Bin(&line);
+    bool center = false;
+    switch (line)
+    {
+    case 0b1000000000: spdr = 35; break;
+    case 0b1100000000: spdr = 30; break;
+    case 0b0100000000: spdr = 25; break;
+    case 0b0110000000: spdr = 20; break;
+    case 0b0010000000: spdr = 15; break;
+    case 0b0011000000: spdr = 10; break;
+    case 0b0001000000: spdr = 5; break;
+    case 0b0001100000: spdr = 0; break;
+    case 0b0000100000: spdr = 0; break;
+    case 0b0000010000: spdl = 0; break;
+    case 0b0000011000: spdl = 0; break;
+    case 0b0000001000: spdl = 5; break;
+    case 0b0000001100: spdl = 10; break;
+    case 0b0000000100: spdl = 15; break;
+    case 0b0000000110: spdl = 20; break;
+    case 0b0000000010: spdl = 25; break;
+    case 0b0000000011: spdl = 30; break;
+    case 0b0000000001: spdl = 35; break;
+    case 0b0001111000: center = true; break;
+    }
+    if (center)
+    {
+      // break;
+    }
+    // showonlcd((String) "rpm: " + rpmL + "  " + rpmR + 
+    //           "\nspd: " + spdl + "  " + spdr +
+    //           "\nclr: " + packet.id);
+
+    kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
+    delay(5);
+  }
+  kinematik(0,0);
+  return colordetected;
 }
 void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime){
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
   motorcmFunc(speed, cm, backBrakeTime, sideAvoidance);
+}
+void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t threshold = 2){
+  if (iMC) return; nFunc++; if(mStep < nStep) return;
+  if (debugMode == by_func) waitKey4();
+  // menyamakan heading aktual dengan referensi
+  useBuzzerOn();
+  while(abs(headingRef-heading) > threshold)
+  {
+    imusense();
+    if(headingRef < heading)
+    {
+      kinematik(-speed,speed);
+    }
+    else
+    {
+      kinematik(speed,-speed);
+    }
+  }
+  useBuzzerOff();
+  // maju sejauh cm dan selalu koreksi heading
+  counterR = 0;
+  uint32_t step = 15 * cm;
+  while (counterR < step)
+  {
+    imusense();
+    int16_t error = headingRef - heading;
+    int spdl = speed - error;
+    int spdr = speed + error;
+    kinematik(spdl,spdr);
+  }
+  kinematik(0,0);
 }
 void line(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime)
 {
@@ -1456,6 +1667,7 @@ void linefind(int16_t leftSpeed, int16_t rightSpeed, uint16_t timeToDisregardLin
   if (debugMode == by_func) waitKey4();
   useBuzzerOn();
   bool isFound = false;
+  cleanSensor();
   unsigned long timeStart = millis();
   while (!isFound)
   {
@@ -2123,7 +2335,7 @@ void camright(uint16_t timedelay)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
-  servo(5,25); // sesuaikan
+  servo(5,35); // sesuaikan
   useBuzzerOn();
   delay(timedelay);
   useBuzzerOff();
@@ -2146,21 +2358,19 @@ void camleft(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
-uint8_t camdetectcolor(bool whichSensor, uint16_t timeout = 1000)
+uint8_t camdetectcolor(bool whichSensor)
 {
   if (iMC) return 0; nFunc++; if(mStep < nStep) return 0;
   if (debugMode == by_func) waitKey4();
   PacketHusky packet;
-  unsigned long timeStart = millis();
   packet = readHusky(whichSensor, 'C');
   return packet.id;
 }
-String raspidetectqr(bool whichSensor, uint16_t timeout = 1200){
+String raspidetectqr(bool whichSensor){
   if (iMC) return ""; nFunc++; if(mStep < nStep) return "";
   if (debugMode == by_func) waitKey4();
 
   PacketRaspi packet;
-  unsigned long timeStart = millis();
   packet = readRaspi(whichSensor);
   return packet.data;
 }
@@ -2179,6 +2389,7 @@ void setup()
 {
   fsensor.begin(115200);
   rsensor.begin(115200);
+  // imuserial.begin(115200);
   Wire.begin();
   delay(10);
   srv.begin();
@@ -2189,12 +2400,16 @@ void setup()
   pinMode(pwm4, OUTPUT);
   pinMode(buzz, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(pwm1, 0);
+  digitalWrite(pwm2, 0);
+  digitalWrite(pwm3, 0);
+  digitalWrite(pwm4, 0);
+  digitalWrite(buzz, 0);  
+  digitalWrite(LED_BUILTIN, 0);
   pinMode(btn1, INPUT_PULLUP);
   pinMode(btn2, INPUT_PULLUP);
   pinMode(btn3, INPUT_PULLUP);
   pinMode(btn4, INPUT_PULLUP);
-  digitalWrite(LED_BUILTIN, 0);
-  digitalWrite(buzz, 0);  
   pinMode(PA0, INPUT);
   pinMode(PA1, INPUT);
   attachInterrupt(digitalPinToInterrupt(PA0), pulseCountL, RISING);
@@ -2210,6 +2425,11 @@ void setup()
   countSetPoint();
 
   buzzer(3,50,100);
+  // showonlcd("Kalibrasi Tilt");
+  // // delay(3000);
+  // imuserial.write(0xA5);
+  // imuserial.write(0x54);
+  // delay(1000);
   
   unsigned long lcdTiming = millis();
   btnTiming = millis();

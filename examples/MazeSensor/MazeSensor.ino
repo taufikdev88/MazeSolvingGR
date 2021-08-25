@@ -128,7 +128,7 @@ void readRaspberrypi(){
     char c = (char) Serial1.read();
     temp += c;
   }
-  Serial3.print(data);
+  Serial3.print(temp);
 }
 
 /*
