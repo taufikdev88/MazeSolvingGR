@@ -62,7 +62,8 @@ void customloop();
 /*
  * Stock functions
  */
-#define delay_ms delay
+#define delay_ms delay_maze
+
 void buzzerled(bool useBuzzer, bool useLED, uint8_t numberOfTimes, uint16_t interval, uint16_t customOffTime = 0);
 #define led(numberOfTimes,onTime,offTime) buzzerled(0,1,numberOfTimes,onTime,offTime)
 #define buzzer(numberOfTimes,onTime,offTime) buzzerled(1,0,numberOfTimes,onTime,offTime)
@@ -101,9 +102,10 @@ void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime);
 void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
 void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime);
 int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive, int8_t colorId);
+String motorrpmdetectqr(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive);
 
-void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime); // belum
-void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t threshold); // belum
+void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime); // not implemented
+void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t threshold); // not implemented
 
 void line(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime);
 void linet(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime);
@@ -118,6 +120,7 @@ void sline(uint8_t sensor, int16_t speed, int16_t backBrakeTime);
 void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t backBrakeTime);
 
 void leftline(int16_t speed, uint16_t runtime, bool supermode = false);
+String leftlinedetectqr(int16_t speed, uint16_t runtime, bool supermode = false);
 void rightline(int16_t speed, uint16_t runtime, bool supermode = false);
 
 void left(int16_t speed, uint16_t backBrakeTime);
@@ -159,5 +162,6 @@ void camleft(uint16_t timedelay);
 uint8_t camdetectcolor(bool whichSensor);
 String raspidetectqr(bool whichSensor, int8_t t);
 void showonlcd(String data);
+void delay_maze(uint32_t delayMilli);
 
 #endif
