@@ -115,8 +115,8 @@ const StrFormat InfoLineMissing{1285,12};
 bool iUB = true;  // is use buzzer
 bool iUE = true;  // is use error
 bool iTF = true;  // is trace forward
-bool iMC = true;  // is mode count
 bool iED = false; // is error detected 
+bool iMC = true;  // is mode count
 
 int16_t nFunc     = 0;
 int16_t nStep     = 0;
@@ -1469,13 +1469,12 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
       kinematik(0,0);
       break;
     }
-    // showonlcd((String) "rpm: " + rpmL + "  " + rpmR + "\nspd: " + spdl + "  " + spdr);
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
     delay(10);
   }
   kinematik(0,0);
 }
-int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime, bool avoidActive, int8_t colorId)
+int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive, int8_t colorId)
 {
   if (iMC) return 0; nFunc++; if(mStep < nStep) return 0;
   if (debugMode == by_func) waitKey4();
@@ -1562,9 +1561,6 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBra
     {
       // break;
     }
-    // showonlcd((String) "rpm: " + rpmL + "  " + rpmR + 
-    //           "\nspd: " + spdl + "  " + spdr +
-    //           "\nclr: " + packet.id);
 
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
     delay(5);
@@ -2366,12 +2362,18 @@ uint8_t camdetectcolor(bool whichSensor)
   packet = readHusky(whichSensor, 'C');
   return packet.id;
 }
-String raspidetectqr(bool whichSensor){
+String raspidetectqr(bool whichSensor, int8_t t){
   if (iMC) return ""; nFunc++; if(mStep < nStep) return "";
   if (debugMode == by_func) waitKey4();
 
   PacketRaspi packet;
-  packet = readRaspi(whichSensor);
+  while (packet.data == "" && t > 0)
+  {
+    t--;
+    packet = readRaspi(whichSensor); 
+    showonlcd((String) t + ". " + packet.data);
+    delay(1000);
+  }
   return packet.data;
 }
 void showonlcd(String data)
