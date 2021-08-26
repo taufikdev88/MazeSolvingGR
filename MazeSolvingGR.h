@@ -6,7 +6,6 @@
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306_STM32.h>
-#include <MPU6050_Maze.h>
 #include <Adafruit_PWMServoDriver.h>
 
 /*

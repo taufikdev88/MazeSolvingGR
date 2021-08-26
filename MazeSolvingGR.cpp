@@ -168,7 +168,6 @@ struct PacketRaspi
   String data = "";
 };
 
-MPU6050 mpu6050(Wire);
 Adafruit_PWMServoDriver srv = Adafruit_PWMServoDriver();
 Adafruit_SSD1306 display(4);
 // **************************************************************************** interrupt service
