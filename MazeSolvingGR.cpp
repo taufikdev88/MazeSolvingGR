@@ -206,7 +206,7 @@ float getRPMR()
 // **********************************************************************************************
 // *************************************************************** communicate with sensor module
 void imusense(){
-
+  // not implemented
 }
 PacketHusky readHusky(bool ws, char md)
 {
@@ -311,19 +311,19 @@ PacketHusky readHusky(bool ws, char md)
   }
   return p;
 }
-PacketRaspi readRaspi(bool ws)
+PacketRaspi readRaspi(bool ws, uint16_t timeout = 1100)
 {
   HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
   PacketRaspi p;
   uint8_t pidx = 0;
   uint8_t pcnt = 0;
   String pstr = "";
-  os->write('R');
+  if(!os->available()) os->write('R');
   unsigned long timestart = millis();
   bool rto = false;
   while (!os->available())
   {
-    if ((unsigned long) millis()-timestart > 1100) 
+    if ((unsigned long) millis()-timestart > timeout) 
     {
       rto = true;
       break;
@@ -374,6 +374,16 @@ PacketRaspi readRaspi(bool ws)
       else 
       {
         if (pidx < 4 && !isDigit(c))
+        {
+          p.x = 0;
+          p.y = 0;
+          p.w = 0;
+          p.h = 0;
+          p.data = "";
+          pcnt = 0;
+          continue;
+        }
+        else if(pidx == 4 && isDigit(c))
         {
           p.x = 0;
           p.y = 0;
@@ -687,6 +697,211 @@ void errorRaised()
     if (l != 0x00) break;
   }
   log(F("run"));
+}
+int16_t leftlineError(bool supermode = false){
+  int16_t error = 0;
+  readSensor(iTF ? ff : bb);
+  uint16_t l = 0;
+  senData2Bin(&l);
+  switch (l)
+  {
+  // tidak mendeteksi garis
+  case 0b0000000000: error = -13; break;
+  // sensor 2 garis data bagus, 3
+  case 0b1000000000: error = 0; break;
+  case 0b1100000000: error = 13; break;
+  case 0b0100000000: error = 16; break;
+  case 0b0110000000: error = 19; break;
+  case 0b0010000000: error = 21; break;
+  case 0b0011000000: error = 24; break;
+  case 0b0001000000: error = 27; break;
+  case 0b0001100000: error = 30; break;
+  case 0b0000100000: error = 36; break;
+  case 0b0000110000: error = 39; break;
+  case 0b0000010000: error = 42; break;
+  case 0b0000011000: error = 45; break;
+  case 0b0000001000: error = 48; break;
+  case 0b0000001100: error = 51; break;
+  case 0b0000000100: error = 54; break;
+  case 0b0000000110: error = 57; break;
+  case 0b0000000010: error = 60; break;
+  case 0b0000000011: error = 63; break;
+  case 0b0000000001: error = 66; break;
+  // sensor 3 garis data bagus, 7
+  case 0b1110000000: error = 13; break;
+  case 0b0111000000: error = 20; break;
+  case 0b0011100000: error = 27; break;
+  case 0b0001110000: error = 34; break;
+  case 0b0000111000: error = 41; break;
+  case 0b0000011100: error = 48; break;
+  case 0b0000001110: error = 55; break;
+  case 0b0000000111: error = 62; break;
+  // sensor 4 garis data bagus, 11
+  case 0b1111000000: error = 26; break;
+  case 0b0111100000: error = 37; break; 
+  case 0b0011110000: error = 48; break;
+  case 0b0001111000: error = 59; break;
+  case 0b0000111100: error = 70; break;
+  case 0b0000011110: error = 81; break;
+  case 0b0000001111: error = 92; break;
+  // sensor 5 garis data bagus, 17
+  case 0b1111100000: error = 39; break;
+  case 0b0111110000: error = 56; break;
+  case 0b0011111000: error = 73; break;
+  case 0b0001111100: error = 90; break;
+  case 0b0000111110: error = 107; break;
+  case 0b0000011111: error = 124; break;
+  // sensor 6 garis data bagus, 23
+  case 0b1111110000: error = 52; break;
+  case 0b0111111000: error = 75; break;
+  case 0b0011111100: error = 98; break;
+  case 0b0001111110: error = 121; break;
+  case 0b0000111111: error = 144; break;
+  // 
+  //  di tempat yg tepat tp sensor lain error
+  case 0b1000000001:
+  case 0b1000000010:
+  case 0b1000000100:
+  case 0b1000001000:
+  case 0b1000010000:
+  case 0b1000100000:
+  case 0b1001000000:
+  case 0b1010000000:
+  case 0b1001000001:
+  case 0b1000100001:
+  case 0b1000010001:
+  case 0b1000001001:
+  case 0b1010000010:
+  case 0b1001000010:
+  case 0b1000100010:
+  case 0b1000010010:
+  case 0b1000001010:
+  case 0b1010000100:
+  case 0b1001000100:
+  case 0b1000100100:
+  case 0b1000010100:
+  case 0b1001001000:
+  case 0b1000101000: error = 0; break;
+  }
+  if (supermode)
+  {
+    switch (l)
+    {
+      case 0b1111100000: error = 10; break;
+      case 0b1111110000: error = 22; break;
+      case 0b1111111000: error = 36; break;
+      case 0b1111111100: error = 42; break;
+      case 0b1111111110: error = 60; break;
+      case 0b1111111111: error = 80; break;
+      case 0b0111111111: error = 102; break;
+      case 0b0011111111: error = 126; break;
+      case 0b0001111111: error = 152; break;
+      case 0b0000111111: error = 180; break;
+      case 0b0000011111: error = 210; break;
+
+      case 0b1100000001: error = 130; break;
+      case 0b1100000011: error = 160; break;
+      case 0b1100000111: error = 190; break;
+      case 0b1100001111: error = 220; break;
+      case 0b1100011111: error = 255; break;
+    }
+  }
+  return error;
+}
+int16_t rightlineError(bool supermode = false)
+{
+  readSensor(iTF ? ff : bb);
+  uint16_t l = 0;
+  senData2Bin(&l);
+  int16_t error = 0;
+  switch (l){
+    // sensor 2 garis data bagus
+    case 0b0000000000: error = 13; break;
+    case 0b1000000000: error = -63; break;
+    case 0b1100000000: error = -60; break;
+    case 0b0100000000: error = -57; break;
+    case 0b0110000000: error = -54; break;
+    case 0b0010000000: error = -51; break;
+    case 0b0011000000: error = -48; break;
+    case 0b0001000000: error = -45; break;
+    case 0b0001100000: error = -42; break;
+    case 0b0000100000: error = -39; break;
+    case 0b0000110000: error = -36; break;
+    case 0b0000010000: error = -33; break;
+    case 0b0000011000: error = -30; break;
+    case 0b0000001000: error = -27; break;
+    case 0b0000001100: error = -24; break;
+    case 0b0000000100: error = -21; break;
+    case 0b0000000110: error = -19; break;
+    case 0b0000000010: error = -16; break;
+    case 0b0000000011: error = -13; break;
+    case 0b0000000001: error = 0; break;
+    // sensor 3 garis data bagus
+    case 0b1110000000: error = -62; break;
+    case 0b0111000000: error = -55; break;
+    case 0b0011100000: error = -48; break;
+    case 0b0001110000: error = -41; break;
+    case 0b0000111000: error = -34; break;
+    case 0b0000011100: error = -27; break;
+    case 0b0000001110: error = -20; break;
+    case 0b0000000111: error = -13; break;
+    // sensor 4 garis data bagus
+    case 0b1111000000: error = -92; break;
+    case 0b0111100000: error = -81; break; 
+    case 0b0011110000: error = -70; break;
+    case 0b0001111000: error = -59; break;
+    case 0b0000111100: error = -48; break;
+    case 0b0000011110: error = -37; break;
+    case 0b0000001111: error = -26; break;
+    //  di tempat yg tepat tp sensor lain error
+    case 0b1000000001:
+    case 0b0100000001:
+    case 0b0010000001:
+    case 0b0001000001:
+    case 0b0000100001:
+    case 0b0000010001:
+    case 0b0000001001:
+    case 0b0000000101:
+    case 0b1000001001:
+    case 0b1000010001:
+    case 0b1000100001:
+    case 0b1001000001:
+    case 0b0100000101:
+    case 0b0100001001:
+    case 0b0100010001:
+    case 0b0100100001:
+    case 0b0101000001:
+    case 0b0010000101:
+    case 0b0010001001:
+    case 0b0010010001:
+    case 0b0010100001:
+    case 0b0001001001:
+    case 0b0001010001: error = 0; break;
+  }
+  if (supermode)
+  {
+    switch (l)
+    {
+      case 0b1111100000: error = -210; break;
+      case 0b1111110000: error = -180; break;
+      case 0b1111111000: error = -152; break;
+      case 0b1111111100: error = -126; break;
+      case 0b1111111110: error = -102; break;
+      case 0b1111111111: error = -80; break;
+      case 0b0111111111: error = -60; break;
+      case 0b0011111111: error = -42; break;
+      case 0b0001111111: error = -36; break;
+      case 0b0000111111: error = -22; break;
+      case 0b0000011111: error = -10; break;
+      
+      case 0b1000000011: error = -130; break;
+      case 0b1100000011: error = -160; break;
+      case 0b1110000011: error = -190; break;
+      case 0b1111000011: error = -220; break;
+      case 0b1111100011: error = -250; break;
+    }
+  }
+  return error;
 }
 void controllerRun(uint16_t line, int16_t speed, bool useError = true)
 {
@@ -1387,14 +1602,12 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
-
   int16_t spdl = 0;
   int16_t spdr = 0;
   float iErrorL = 0;
   float iErrorR = 0;
   float dErrorL = 0;
   float dErrorR = 0;
-
   cleanSensor();
   unsigned long timeStart = millis();
   while ((unsigned long) millis()-timeStart < runTime)
@@ -1446,6 +1659,9 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
     case 0b0000000010: spdl = 25; break;
     case 0b0000000011: spdl = 30; break;
     case 0b0000000001: spdl = 35; break;
+    case 0b1000000001:
+    case 0b1100000001:
+    case 0b1000000011:
     case 0b0000110000:
     case 0b0001110000:
     case 0b0000111000: 
@@ -1456,6 +1672,14 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
     case 0b0111111000:
     case 0b0001111110:
     case 0b0111111110:
+    case 0b1111111110:
+    case 0b1111111100:
+    case 0b1111111000:
+    case 0b1111100000:
+    case 0b1111000000:
+    case 0b1110000000:
+    case 0b0000000111:
+    case 0b0000001111:
     case 0b0000011111:
     case 0b0000111111:
     case 0b0001111111:
@@ -1477,7 +1701,6 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive
 {
   if (iMC) return 0; nFunc++; if(mStep < nStep) return 0;
   if (debugMode == by_func) waitKey4();
-
   int16_t spdl = 0;
   int16_t spdr = 0;
   float iErrorL = 0;
@@ -1485,7 +1708,6 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive
   float dErrorL = 0;
   float dErrorR = 0;
   PacketHusky packet;
-
   cleanSensor();
   int8_t colordetected = 0;
   unsigned long timeStart = millis();
@@ -1566,6 +1788,11 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive
   }
   kinematik(0,0);
   return colordetected;
+}
+String motorrpmdetectqr(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive){
+  if (iMC) return "MODECOUNT"; nFunc++; if(mStep < nStep) return "SKIPSTEP";
+  if (debugMode == by_func) waitKey4();
+  // not implemented
 }
 void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime){
   if (iMC) return; nFunc++; if(mStep < nStep) return;
@@ -1771,116 +1998,13 @@ void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t ba
 void leftline(int16_t speed, uint16_t runtime, bool supermode)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
-  if (debugMode == by_func) waitKey4();
-  
+  if (debugMode == by_func) waitKey4();  
+  cleanSensor();
   unsigned long timeStart = millis();
   while ((unsigned long) millis()-timeStart < runtime)
   {
-    readSensor(iTF ? ff : bb);
-    uint16_t l = 0;
-    senData2Bin(&l);
-    int16_t error = 0;
     int16_t pwm = 0;
-    switch (l)
-    {
-    // sensor 2 garis data bagus
-    case 0b1000000000: error = -8; break;
-    case 0b1100000000: error = 0; break;
-    case 0b0100000000: error = 4; break;
-    case 0b0110000000: error = 7; break;
-    case 0b0010000000: error = 10; break;
-    case 0b0011000000: error = 13; break;
-    case 0b0001000000: error = 16; break;
-    case 0b0001100000: error = 19; break;
-    case 0b0000100000: error = 21; break;
-    case 0b0000110000: error = 24; break;
-    case 0b0000010000: error = 27; break;
-    case 0b0000011000: error = 30; break;
-    case 0b0000001000: error = 33; break;
-    case 0b0000001100: error = 36; break;
-    case 0b0000000100: error = 39; break;
-    case 0b0000000110: error = 42; break;
-    case 0b0000000010: error = 45; break;
-    case 0b0000000011: error = 48; break;
-    case 0b0000000001: error = 51; break;
-    case 0b0000000000: error = -8 * Kp; break;
-    // sensor 3 garis data bagus
-    case 0b1110000000: error = 5; break;
-    case 0b0111000000: error = 7; break;
-    case 0b0011100000: error = 14; break;
-    case 0b0001110000: error = 21; break;
-    case 0b0000111000: error = 28; break;
-    case 0b0000011100: error = 35; break;
-    case 0b0000001110: error = 42; break;
-    case 0b0000000111: error = 49; break;
-    // sensor 4 garis data bagus
-    case 0b1111000000: error = 7; break;
-    case 0b0111100000: error = 9; break; 
-    case 0b0011110000: error = 18; break;
-    case 0b0001111000: error = 27; break;
-    case 0b0000111100: error = 36; break;
-    case 0b0000011110: error = 45; break;
-    case 0b0000001111: error = 54; break;
-    // sensor 5 garis data bagus
-    case 0b1111100000: error = 9; break;
-    case 0b0111110000: error = 11; break;
-    case 0b0011111000: error = 22; break;
-    case 0b0001111100: error = 33; break;
-    case 0b0000111110: error = 44; break;
-    case 0b0000011111: error = 55; break;
-    // sensor 6 garis data bagus
-    case 0b1111110000: error = 11; break;
-    case 0b0111111000: error = 13; break;
-    case 0b0011111100: error = 26; break;
-    case 0b0001111110: error = 39; break;
-    case 0b0000111111: error = 52; break;
-    // 
-    //  di tempat yg tepat tp sensor lain error
-    case 0b1100000001:
-    case 0b1100000010:
-    case 0b1100000100:
-    case 0b1100001000:
-    case 0b1100010000:
-    case 0b1100100000:
-    case 0b1101000000:
-
-    case 0b1101000001:
-    case 0b1100100001:
-    case 0b1100010001:
-    case 0b1100001001:
-    case 0b1101000010:
-    case 0b1100100010:
-    case 0b1100010010:
-    case 0b1100001010:
-    case 0b1101000100:
-    case 0b1100100100:
-    case 0b1100010100:
-    case 0b1101001000:
-    case 0b1100101000: error = 0; break;
-    }
-    if (supermode)
-    {
-      switch (l)
-      {
-        case 0b1111100000: error = 10; break;
-        case 0b1111110000: error = 22; break;
-        case 0b1111111000: error = 36; break;
-        case 0b1111111100: error = 42; break;
-        case 0b1111111110: error = 60; break;
-        case 0b1111111111: error = 80; break;
-        case 0b0111111111: error = 102; break;
-        case 0b0011111111: error = 126; break;
-        case 0b0001111111: error = 152; break;
-        case 0b0000111111: error = 180; break;
-        case 0b0000011111: error = 210; break;
-
-        case 0b1100000001: error = 130; break;
-        case 0b1100000011: error = 160; break;
-        case 0b1100000111: error = 190; break;
-        case 0b1100001111: error = 220;
-        case 0b1100011111: error = 255; break;
-      }
-    }
+    int16_t error = leftlineError(supermode);
     pwm = Kp * error + Kd * (error - dError);
     pwm = constrain(pwm, -255, 255);
     dError = error;
@@ -1890,103 +2014,40 @@ void leftline(int16_t speed, uint16_t runtime, bool supermode)
   }
   kinematik(0,0);
 }
+String leftlinedetectqr(int16_t speed, uint16_t runtime, bool supermode)
+{
+  if (iMC) return "COUNTMODE"; nFunc++; if(mStep < nStep) return "SKIPSTEP";
+  if (debugMode == by_func) waitKey4();  
+  cleanSensor();
+  PacketRaspi packet;
+  unsigned long timeStart = millis();
+  while ((unsigned long) millis()-timeStart < runtime)
+  {
+    packet = readRaspi(bb, 1);
+    if (packet.data != "") break;
+
+    int16_t pwm = 0;
+    int16_t error = leftlineError(supermode);
+    pwm = Kp * error + Kd * (error - dError);
+    pwm = constrain(pwm, -255, 255);
+    dError = error;
+    int16_t spdl = speed + pwm;
+    int16_t spdr = speed - pwm;
+    kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
+  }
+  kinematik(0,0);
+  return packet.data;
+}
 void rightline(int16_t speed, uint16_t runtime, bool supermode)
 {
   if (iMC) return; nFunc++; if(mStep < nStep) return;
   if (debugMode == by_func) waitKey4();
+  cleanSensor();
   unsigned long timeStart = millis();
   while ((unsigned long) millis()-timeStart < runtime)
   {
-    readSensor(iTF ? ff : bb);
-    uint16_t l = 0;
-    senData2Bin(&l);
-    int16_t error = 0;
     int16_t pwm = 0;
-    switch (l){
-      // sensor 2 garis data bagus
-      case 0b0000000000: error = 8 * Kp; break;
-      case 0b1000000000: error = -51; break;
-      case 0b1100000000: error = -48; break;
-      case 0b0100000000: error = -45; break;
-      case 0b0110000000: error = -42; break;
-      case 0b0010000000: error = -39; break;
-      case 0b0011000000: error = -36; break;
-      case 0b0001000000: error = -33; break;
-      case 0b0001100000: error = -30; break;
-      case 0b0000100000: error = -27; break;
-      case 0b0000110000: error = -24; break;
-      case 0b0000010000: error = -21; break;
-      case 0b0000011000: error = -19; break;
-      case 0b0000001000: error = -16; break;
-      case 0b0000001100: error = -13; break;
-      case 0b0000000100: error = -10; break;
-      case 0b0000000110: error = -7; break;
-      case 0b0000000010: error =  -4; break;
-      case 0b0000000011: error = 0; break;
-      case 0b0000000001: error = 8; break;
-      // sensor 3 garis data bagus
-      case 0b1110000000: error = -49; break;
-      case 0b0111000000: error = -42; break;
-      case 0b0011100000: error = -35; break;
-      case 0b0001110000: error = -28; break;
-      case 0b0000111000: error = -21; break;
-      case 0b0000011100: error = -14; break;
-      case 0b0000001110: error = -7; break;
-      case 0b0000000111: error = -5; break;
-      // sensor 4 garis data bagus
-      case 0b1111000000: error = -54; break;
-      case 0b0111100000: error = -45; break; 
-      case 0b0011110000: error = -36; break;
-      case 0b0001111000: error = -27; break;
-      case 0b0000111100: error = -18; break;
-      case 0b0000011110: error = -9; break;
-      case 0b0000001111: error = 0; break;
-      //  di tempat yg tepat tp sensor lain error
-      case 0b1000000011:
-      case 0b0100000011:
-      case 0b0010000011:
-      case 0b0001000011:
-      case 0b0000100011:
-      case 0b0000010011:
-      case 0b0000001011:
-      case 0b1000001011:
-      case 0b1000010011:
-      case 0b1000100011:
-      case 0b1001000011:
-      case 0b0100001011:
-      case 0b0100010011:
-      case 0b0100100011:
-      case 0b0101000011:
-      case 0b0010001011:
-      case 0b0010010011:
-      case 0b0010100011:
-      case 0b0001001011:
-      case 0b0001010011: error = 0; break;
-    }
-    if (supermode)
-    {
-      switch (l)
-      {
-        case 0b1111100000: error = -210; break;
-        case 0b1111110000: error = -180; break;
-        case 0b1111111000: error = -152; break;
-        case 0b1111111100: error = -126; break;
-        case 0b1111111110: error = -102; break;
-        case 0b1111111111: error = -80; break;
-        case 0b0111111111: error = -60; break;
-        case 0b0011111111: error = -42; break;
-        case 0b0001111111: error = -36; break;
-        case 0b0000111111: error = -22; break;
-        case 0b0000011111: error = -10; break;
-        
-        case 0b1000000011: error = -130; break;
-        case 0b1100000011: error = -160; break;
-        case 0b1110000011: error = -190; break;
-        case 0b1111000011: error = -220; break;
-        case 0b1111100011: error = -250; break;
-      }
-    }
-    
+    int16_t error = rightlineError(supermode);
     pwm = Kp * error + Kd * (error - dError);
     pwm = constrain(pwm, -255, 255);
     dError = error;
@@ -2362,9 +2423,8 @@ uint8_t camdetectcolor(bool whichSensor)
   return packet.id;
 }
 String raspidetectqr(bool whichSensor, int8_t t){
-  if (iMC) return ""; nFunc++; if(mStep < nStep) return "";
+  if (iMC) return "MODECOUNT"; nFunc++; if(mStep < nStep) return "SKIPSTEP";
   if (debugMode == by_func) waitKey4();
-
   PacketRaspi packet;
   while (packet.data == "" && t > 0)
   {
@@ -2383,6 +2443,11 @@ void showonlcd(String data)
   display.setCursor(0,0);
   display.print(data);
   display.display();
+}
+void delay_maze(uint32_t delayMilli)
+{
+  if (iMC) return; nFunc++; if(mStep < nStep) return;
+  delay(delayMilli);
 }
 // ********************************************************************************
 // ****************************************************************** main function
