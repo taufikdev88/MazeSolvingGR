@@ -108,6 +108,11 @@ void readHuskyLens(){
  * Fungsi ini dipanggil saat mainboard meminta membaca qrcode dari raspberry pi
  */
 void readRaspberrypi(){
+  while(Serial1.available())
+  {
+    Serial1.read();  
+  }
+  
   Serial1.print("r");
   unsigned long timeStart = millis();
   bool timeout = false;
@@ -127,6 +132,7 @@ void readRaspberrypi(){
   {
     char c = (char) Serial1.read();
     temp += c;
+    delay(1);
   }
   Serial3.print(temp);
 }
