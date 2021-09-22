@@ -1,18 +1,18 @@
 yang perlu dicoba dan dipastikan kembali
-1.** tambah strformat untuk fungsi fungsi yg belum ke dalam eeprom
-2.** heading robot dari imu
+1. tambah strformat untuk fungsi fungsi yg belum ke dalam eeprom
+2. heading robot dari imu
 3. coba lagi baca paket dari husky dengan fungsi camdetectcolor
 4. tes fungsi belok dan belokencoder
 5. cari kombinasi Kp Kd yang bagus, start di speed 50 pakai Kp 2.0 Kd 0.0
-6.* ada fungsi motorrpm untuk robot berjalan sesuai kecepatan yg diinginkan, tp itu belakangan. kalo ini Kp, Ki dan Kd , mengaturnya pakai fungsi motorController
+6. ada fungsi motorrpm untuk robot berjalan sesuai kecepatan yg diinginkan, tp itu belakangan. kalo ini Kp, Ki dan Kd , mengaturnya pakai fungsi motorController
 7. tes fungsi motor maju mundur di setiap sensor(ff) maupun sensor(bb)
 8. tes fungsi motor cm juga di setiap sensor(ff) maupun sensor(bb)
-9.** fungsi line,linet,timeline,linedelay,linefind,linedline,linetline,sline,lostline di tes terakhir saja
+9. fungsi line,linet,timeline,linedelay,linefind,linedline,linetline,sline,lostline di tes terakhir saja
 10. tes fungsi leftline Kp Kd ikut seperti pembacaan sensor
 11. tes fungsi rightline
 12. tes fungsi left1 - left7 sampai leftenc
 13. tes fungsi right10 - right4 sampai rightenc
-14.** exline dan exturn di tes diakhir saja
+14. exline dan exturn di tes diakhir saja
 15. cari kombinasi sudut dan pin servo untuk fungsi pick, place, camfront, camright, camrear (ganti fungsi pickup, placeup, pickdn, placedn, take, put, camfornt, camright, camleft) //fix
 16. tes fungsi motorsideavoider
 
