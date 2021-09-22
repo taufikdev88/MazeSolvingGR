@@ -42,9 +42,9 @@
 
 #define l0 PA8
 
-const uint8_t sPin[10] = { s0, s1, s2, s3, s4, s5, s6, s7, s8, s9 };
-const int sensorTotal = (sizeof(sPin)/sizeof(sPin[0]));
-uint16_t thSensor[sensorTotal] = { 0 };
+const uint8_t sPin[10] = {s0, s1, s2, s3, s4, s5, s6, s7, s8, s9};
+const int sensorTotal = (sizeof(sPin) / sizeof(sPin[0]));
+uint16_t thSensor[sensorTotal] = {0};
 bool isBlackLine = true;
 
 unsigned long timing = 0;
@@ -57,26 +57,40 @@ HUSKYLENS huskylens;
 /*
  * Fungsi mengirim hasil dari Husky Lens ke board utama
  */
-void printResult(HUSKYLENSResult result){
-  if(result.command == COMMAND_RETURN_BLOCK){
+void printResult(HUSKYLENSResult result)
+{
+  if (result.command == COMMAND_RETURN_BLOCK)
+  {
     Serial3.print('H'); // head of packet
     Serial3.print('B');
-    Serial3.print(result.xCenter); Serial3.print(',');
-    Serial3.print(result.yCenter); Serial3.print(',');
-    Serial3.print(result.width); Serial3.print(',');
-    Serial3.print(result.height); Serial3.print(',');
-    Serial3.print(result.ID); 
-    Serial3.print('T'); // tail of packet
-  } else if(result.command == COMMAND_RETURN_ARROW){
-    Serial3.print('H'); // head of packet
-    Serial3.print('A');
-    Serial3.print(result.xOrigin); Serial3.print(',');
-    Serial3.print(result.yOrigin); Serial3.print(',');
-    Serial3.print(result.xTarget); Serial3.print(',');
-    Serial3.print(result.yTarget); Serial3.print(',');
+    Serial3.print(result.xCenter);
+    Serial3.print(',');
+    Serial3.print(result.yCenter);
+    Serial3.print(',');
+    Serial3.print(result.width);
+    Serial3.print(',');
+    Serial3.print(result.height);
+    Serial3.print(',');
     Serial3.print(result.ID);
     Serial3.print('T'); // tail of packet
-  } else {
+  }
+  else if (result.command == COMMAND_RETURN_ARROW)
+  {
+    Serial3.print('H'); // head of packet
+    Serial3.print('A');
+    Serial3.print(result.xOrigin);
+    Serial3.print(',');
+    Serial3.print(result.yOrigin);
+    Serial3.print(',');
+    Serial3.print(result.xTarget);
+    Serial3.print(',');
+    Serial3.print(result.yTarget);
+    Serial3.print(',');
+    Serial3.print(result.ID);
+    Serial3.print('T'); // tail of packet
+  }
+  else
+  {
     Serial3.print('N');
   }
 }
@@ -84,20 +98,31 @@ void printResult(HUSKYLENSResult result){
 /*
  * Fungsi ini dipanggil saat mainboard meminta membaca huskylens
  */
-void readHuskyLens(){
-  if(huskyready){
-    if(!huskylens.request()) Serial3.print(F("F1"));
-    else if(!huskylens.isLearned()) Serial3.print(F("F2"));
-    else if(!huskylens.available()) Serial3.print(F("F3"));
-    else {
+void readHuskyLens()
+{
+  if (huskyready)
+  {
+    if (!huskylens.request())
+      Serial3.print(F("F1"));
+    else if (!huskylens.isLearned())
+      Serial3.print(F("F2"));
+    else if (!huskylens.available())
+      Serial3.print(F("F3"));
+    else
+    {
       HUSKYLENSResult result = huskylens.read();
       printResult(result);
     }
-  } else {
-    if(huskylens.begin(Serial1)){
+  }
+  else
+  {
+    if (huskylens.begin(Serial1))
+    {
       huskyready = true;
       Serial3.print('N');
-    } else {
+    }
+    else
+    {
       huskyready = false;
       Serial3.print('F');
     }
@@ -105,48 +130,19 @@ void readHuskyLens(){
 }
 
 /*
- * Fungsi ini dipanggil saat mainboard meminta membaca qrcode dari raspberry pi
- */
-void readRaspberrypi(){
-  while(Serial1.available())
-  {
-    Serial1.read();  
-  }
-  
-  Serial1.print("r");
-  unsigned long timeStart = millis();
-  bool timeout = false;
-  while (!Serial1.available())
-  {
-    if((unsigned long) millis()-timeStart > 1000){
-      timeout = true;
-      break;
-    }
-  }
-  if(timeout){
-    Serial3.print('N');
-    return;
-  }
-  String temp = "";
-  while (Serial1.available())
-  {
-    char c = (char) Serial1.read();
-    temp += c;
-    delay(1);
-  }
-  Serial3.print(temp);
-}
-
-/*
  * Fungsi membaca tombol dengan sampling
  */
-bool readBtn(uint8_t pin){
+bool readBtn(uint8_t pin)
+{
   uint8_t cnt = 0;
-  for(uint8_t i=0; i<5; i++){
-    if(digitalRead(pin) == 0) cnt ++;
+  for (uint8_t i = 0; i < 5; i++)
+  {
+    if (digitalRead(pin) == 0)
+      cnt++;
     delayMicroseconds(10);
   }
-  if(cnt > 4) return true;
+  if (cnt > 4)
+    return true;
   return false;
 }
 
@@ -154,16 +150,21 @@ bool readBtn(uint8_t pin){
  * Fungsi mengambil nilai analog dari sebuah sensor, dengan fungsi sampling agar
  * nilainya lebih akurat
  */
-uint16_t getSensorValue(uint8_t pin, bool sampling = true){
+uint16_t getSensorValue(uint8_t pin, bool sampling = true)
+{
   uint32_t sensorValue = 0;
-  if(sampling){
-    uint8_t i=0;
-    for(i=1; i<=10; i++){
+  if (sampling)
+  {
+    uint8_t i = 0;
+    for (i = 1; i <= 10; i++)
+    {
       sensorValue += analogRead(pin);
       delayMicroseconds(10);
     }
     sensorValue = sensorValue / 10;
-  } else {
+  }
+  else
+  {
     sensorValue = analogRead(pin);
     delayMicroseconds(10);
   }
@@ -173,10 +174,11 @@ uint16_t getSensorValue(uint8_t pin, bool sampling = true){
 /*
  * Fungsi simpan byte ke eeprom external
  */
-void writeByteEEPROM(uint16_t address, byte data){
+void writeByteEEPROM(uint16_t address, byte data)
+{
   Wire.beginTransmission(0x50);
-  Wire.write((uint8_t) (address >> 8));
-  Wire.write((uint8_t) (address & 0xFF));
+  Wire.write((uint8_t)(address >> 8));
+  Wire.write((uint8_t)(address & 0xFF));
   Wire.write(data);
   Wire.endTransmission();
   delay(5);
@@ -185,71 +187,83 @@ void writeByteEEPROM(uint16_t address, byte data){
 /*
  * Fungsi ambil byte dari eeprom
  */
-byte readByteEEPROM(uint16_t address){
+byte readByteEEPROM(uint16_t address)
+{
   byte data = 0xFF;
   Wire.beginTransmission(0x50);
-  Wire.write((uint8_t) (address >> 8));
-  Wire.write((uint8_t) (address & 0xFF));
+  Wire.write((uint8_t)(address >> 8));
+  Wire.write((uint8_t)(address & 0xFF));
   Wire.endTransmission();
   Wire.requestFrom(0x50, 1);
-  if(Wire.available()) data = Wire.read();
+  if (Wire.available())
+    data = Wire.read();
   return data;
 }
 
 /*
  * Fungsi menyimpan nilai sebuah sensor ke eeprom
  */
-void saveValue(int8_t s, uint16_t v){
+void saveValue(int8_t s, uint16_t v)
+{
   uint8_t high = v >> 8;
   uint8_t low = v & 0xFF;
-  writeByteEEPROM(s*2, high);
-  writeByteEEPROM(s*2+1, low);
+  writeByteEEPROM(s * 2, high);
+  writeByteEEPROM(s * 2 + 1, low);
 }
 
 /*
  * Mengambil nilai sebuah sensor dari eeprom
  */
-uint16_t readValue(int8_t s){
+uint16_t readValue(int8_t s)
+{
   uint16_t data = 0x0000;
-  data = readByteEEPROM(s*2);
+  data = readByteEEPROM(s * 2);
   data = data << 8;
-  data = data | readByteEEPROM(s*2+1);
+  data = data | readByteEEPROM(s * 2 + 1);
   return data;
 }
 
 /*
  * Kalibrasi sensor selama 10 detik untuk mengambil nilai minimal maksimal
  */
-void calibrateSensor(){
+void calibrateSensor()
+{
   // siapkan variabel
-  uint16_t value[sensorTotal][2] = { 0 };
+  uint16_t value[sensorTotal][2] = {0};
   uint16_t realValue = 0;
   // set nilai variabel awal ke tengah tengah
-  for(uint8_t i=0; i<sensorTotal; i++){
+  for (uint8_t i = 0; i < sensorTotal; i++)
+  {
     value[i][0] = 1024;
     value[i][1] = 0;
   }
   // jalankan kalibrasi selama 10 detik
   unsigned long timestart = millis();
-  while((unsigned long) millis()-timestart <= 10000){
-    digitalWrite(l0, (((unsigned long) millis()-timestart) / 500) % 2);
-    for(uint8_t i=0; i<sensorTotal; i++){
+  while ((unsigned long)millis() - timestart <= 10000)
+  {
+    digitalWrite(l0, (((unsigned long)millis() - timestart) / 500) % 2);
+    for (uint8_t i = 0; i < sensorTotal; i++)
+    {
       realValue = getSensorValue(sPin[i]);
-      if(realValue < value[i][0]) value[i][0] = realValue;
-      if(realValue > value[i][1]) value[i][1] = realValue;
+      if (realValue < value[i][0])
+        value[i][0] = realValue;
+      if (realValue > value[i][1])
+        value[i][1] = realValue;
       thSensor[i] = (value[i][0] + value[i][1]) / 2;
-    } 
+    }
   }
   digitalWrite(l0, 0);
 }
 
 //******************************** SETUP ********************************
-void setup(){
+void setup()
+{
   Serial3.begin(115200);
   Serial1.begin(115200);
   Wire.begin();
-  
-  for(uint8_t i=0; i<sensorTotal; i++){
+
+  for (uint8_t i = 0; i < sensorTotal; i++)
+  {
     pinMode(sPin[i], INPUT);
     thSensor[i] = readValue(i);
   }
@@ -259,80 +273,109 @@ void setup(){
   pinMode(l0, OUTPUT);
   digitalWrite(l0, 0);
 
-  if(!huskylens.begin(Serial1)){
+  if (!huskylens.begin(Serial1))
+  {
     huskyready = false;
-  } else {
+  }
+  else
+  {
     huskyready = true;
     huskymode = 'L';
     huskylens.writeAlgorithm(ALGORITHM_LINE_TRACKING);
   }
 }
 //******************************** LOOP  ********************************
-void loop() {
-  if(Serial3.available()){
+void loop()
+{
+  if (Serial3.available())
+  {
     char cIn = Serial3.read();
 
-    switch(cIn){
-      case 'A':
+    switch (cIn)
+    {
+    case 'A':
       Serial3.print(F("H"));
-      for(uint8_t i=0; i<sensorTotal; i++){
+      for (uint8_t i = 0; i < sensorTotal; i++)
+      {
         bool biggerThanThreshold = (getSensorValue(sPin[i]) < thSensor[i]);
-        if(isBlackLine) biggerThanThreshold = !biggerThanThreshold;
+        if (isBlackLine)
+          biggerThanThreshold = !biggerThanThreshold;
         Serial3.print(biggerThanThreshold);
       }
       Serial3.print('T');
       break;
-      case 'B': isBlackLine = true; break;
-      case 'W': isBlackLine = false; break;
-      case 'T': Serial3.print('H'); Serial3.print(sensorTotal); Serial3.print('T'); break;
-      case 'H': readHuskyLens(); break;
-      case 'L': 
-      if(huskymode != 'L' && huskyready){
+    case 'B':
+      isBlackLine = true;
+      break;
+    case 'W':
+      isBlackLine = false;
+      break;
+    case 'T':
+      Serial3.print('H');
+      Serial3.print(sensorTotal);
+      Serial3.print('T');
+      break;
+    case 'H':
+      readHuskyLens();
+      break;
+    case 'L':
+      if (huskymode != 'L' && huskyready)
+      {
         huskymode = 'L';
         huskylens.writeAlgorithm(ALGORITHM_LINE_TRACKING);
       }
       readHuskyLens();
       break;
-      case 'Q':
-      if(huskymode != 'Q' && huskyready){
+    case 'Q':
+      if (huskymode != 'Q' && huskyready)
+      {
         huskymode = 'Q';
         huskylens.writeAlgorithm(ALGORITHM_TAG_RECOGNITION);
       }
       readHuskyLens();
       break;
-      case 'C':
-      if(huskymode != 'C' && huskyready){
+    case 'C':
+      if (huskymode != 'C' && huskyready)
+      {
         huskymode = 'C';
         huskylens.writeAlgorithm(ALGORITHM_COLOR_RECOGNITION);
       }
       readHuskyLens();
       break;
-      case 'R':
-      readRaspberrypi();
-      break;
     }
   }
 
-  if(flag == true){
-    if(readBtn(b0)){
+  if (flag == true)
+  {
+    if (readBtn(b0))
+    {
       flag = false;
       digitalWrite(l0, 0);
     }
-    if(readBtn(b1)){
+    if (readBtn(b1))
+    {
       flag = false;
       calibrateSensor();
-      for(uint8_t i=0; i<sensorTotal; i++){
+      for (uint8_t i = 0; i < sensorTotal; i++)
+      {
         saveValue(i, thSensor[i]);
       }
     }
-  } else {
-    if(readBtn(b0)){
+  }
+  else
+  {
+    if (readBtn(b0))
+    {
       timing = millis();
       digitalWrite(l0, 1);
-      while(readBtn(b0));
-      if((unsigned long) millis()-timing > 1000){
+      while (readBtn(b0))
+        ;
+      if ((unsigned long)millis() - timing > 1000)
+      {
         flag = true;
-      } else {
+      }
+      else
+      {
         digitalWrite(l0, 0);
       }
       delay(500);
