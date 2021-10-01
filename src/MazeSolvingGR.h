@@ -4,9 +4,8 @@
  * Dependencies library
  */
 #include <Wire.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306_STM32.h>
 #include <Adafruit_PWMServoDriver.h>
+#include <GyverOLED.h>
 
 /*
  * Global name

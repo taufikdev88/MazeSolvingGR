@@ -1,1 +1,9 @@
-/.vscode
+.vscode
+## for production uncomment this
+# examples/eeprom_test/eeprom_test.ino
+# examples/huskylens/huskylens.ino
+# examples/huskyparsing/huskyparsing.ino
+# examples/MazeSensor/MazeSensor.ino
+# extras/
+# extras/**
+## run on terminal: git rm --cached /{each_folder_above} -r
