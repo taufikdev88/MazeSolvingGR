@@ -170,7 +170,14 @@ struct PacketRaspi
 };
 
 Adafruit_PWMServoDriver srv = Adafruit_PWMServoDriver();
-Adafruit_SSD1306 display(4);
+//GyverOLED<SSD1306_128x32, OLED_BUFFER> display;
+//GyverOLED<SSD1306_128x32, OLED_NO_BUFFER> display;
+//GyverOLED<SSD1306_128x64, OLED_BUFFER> display;
+//GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> display;
+//GyverOLED<SSD1306_128x64, OLED_BUFFER, OLED_SPI, 8, 7, 6> display;
+GyverOLED<SSH1106_128x64> display;
+// atau bisa langsung passing alamat: GyverOLED display(0x3C);
+
 // **************************************************************************** interrupt service
 volatile uint32_t counterL = 0;
 volatile uint32_t counterR = 0;
@@ -311,6 +318,96 @@ PacketHusky readHusky(bool ws, char md)
       }
     }
     pcnt++;
+  }
+  return p;
+}
+PacketRaspi readRaspi(bool ws, uint16_t timeout = 1100)
+{
+  HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
+  PacketRaspi p;
+  uint8_t pidx = 0;
+  uint8_t pcnt = 0;
+  String pstr = "";
+  if(!os->available()) os->write('R');
+  unsigned long timestart = millis();
+  bool rto = false;
+  while (!os->available())
+  {
+    if ((unsigned long) millis()-timestart > timeout) 
+    {
+      rto = true;
+      break;
+    }
+  }
+  if (rto) return p;
+  while (os->available())
+  {
+    char c = (char) os->read();
+    if (pcnt == 0)
+    {
+      if (c != 'H')
+      {
+        pcnt = 0;
+        continue;
+      }
+      pstr = "";
+    }
+    else
+    {
+      if (c == ',' || c == 'T')
+      {
+        if (pidx == 0)
+        {
+          p.x = pstr.toInt();
+        }
+        else if (pidx == 1)
+        {
+          p.y = pstr.toInt();
+        }
+        else if (pidx == 2)
+        {
+          p.w = pstr.toInt();
+        }
+        else if (pidx == 3)
+        {
+          p.h = pstr.toInt();
+        }
+        else if (pidx == 4)
+        {
+          p.data = pstr;
+          pcnt = 0;
+          continue;
+        }
+        pidx++;
+        pstr = "";
+      }
+      else 
+      {
+        if (pidx < 4 && !isDigit(c))
+        {
+          p.x = 0;
+          p.y = 0;
+          p.w = 0;
+          p.h = 0;
+          p.data = "";
+          pcnt = 0;
+          continue;
+        }
+        else if(pidx == 4 && isDigit(c))
+        {
+          p.x = 0;
+          p.y = 0;
+          p.w = 0;
+          p.h = 0;
+          p.data = "";
+          pcnt = 0;
+          continue;
+        }
+        pstr += c;
+      }
+    }
+    pcnt++;
+    delay(1);
   }
   return p;
 }
@@ -482,7 +579,7 @@ String getStringFormat(StrFormat sf)
 }
 void log(String l)
 {
-  display.clearDisplay();
+  display.clear();
   display.setCursor(0, 0);
   display.print(runMode);
   display.print(F(" / "));
@@ -504,11 +601,11 @@ void log(String l)
   mazeLog[1] = l;
   display.println(mazeLog[0]);
   display.println(mazeLog[1]);
-  display.display();
+  display.update();
 }
 void displayMenu()
 {
-  display.clearDisplay();
+  display.clear();
   display.setCursor(0, 0);
   display.print(getStringFormat(MenuMode));
   display.println(runMode);
@@ -538,7 +635,7 @@ void displayMenu()
   readSensor(bb);
   sprintf(d, getStringFormat(InfoRearSensor).c_str(), senData[9], senData[8], senData[7], senData[6], senData[5], senData[4], senData[3], senData[2], senData[1], senData[0]);
   display.println(d);
-  display.display();
+  display.update();
 }
 // **********************************************************************************************
 // *********************************************************************************** robot data
@@ -2836,10 +2933,10 @@ void showonlcd(String data)
     return;
   if (debugMode == by_func)
     waitKey4();
-  display.clearDisplay();
+  display.clear();
   display.setCursor(0, 0);
   display.print(data);
-  display.display();
+  display.update();
 }
 void delay_maze(uint32_t delayMilli)
 {
@@ -2854,50 +2951,51 @@ void delay_maze(uint32_t delayMilli)
 // ****************************************************************** main function
 void setup()
 {
+  // serial sensor init
   fsensor.begin(115200);
   rsensor.begin(115200);
-  // imuserial.begin(115200);
+  // i2c communication init
   Wire.begin();
   delay(10);
+  // servo driver init
   srv.begin();
   srv.setPWMFreq(60);
+  // pin io mode init
   pinMode(pwm1, OUTPUT);
   pinMode(pwm2, OUTPUT);
   pinMode(pwm3, OUTPUT);
   pinMode(pwm4, OUTPUT);
   pinMode(buzz, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
+  // default pin output value
   digitalWrite(pwm1, 0);
   digitalWrite(pwm2, 0);
   digitalWrite(pwm3, 0);
   digitalWrite(pwm4, 0);
   digitalWrite(buzz, 0);
   digitalWrite(LED_BUILTIN, 0);
+  // button init
   pinMode(btn1, INPUT_PULLUP);
   pinMode(btn2, INPUT_PULLUP);
   pinMode(btn3, INPUT_PULLUP);
   pinMode(btn4, INPUT_PULLUP);
+  // external interrupt init
   pinMode(PA0, INPUT);
   pinMode(PA1, INPUT);
   attachInterrupt(digitalPinToInterrupt(PA0), pulseCountL, RISING);
   attachInterrupt(digitalPinToInterrupt(PA1), pulseCountR, RISING);
-  display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
-  display.display();
-  delay(10);
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(white);
+  // display init
+  display.init();
+  display.clear();
+  display.setScale(1);
+  display.invertDisplay(false);
+  // custom maze robot init
   initMazeRobot();
+  // first setup
   getLastMode();
   countSetPoint();
-
   buzzer(3, 50, 100);
-  // showonlcd("Kalibrasi Tilt");
-  // // delay(3000);
-  // imuserial.write(0xA5);
-  // imuserial.write(0x54);
-  // delay(1000);
-
+  // main menu
   unsigned long lcdTiming = millis();
   btnTiming = millis();
   while (1)
@@ -2944,8 +3042,9 @@ void setup()
       lcdTiming = millis();
     }
   }
-  display.clearDisplay();
-  display.setCursor(0, 0);
+  // run confirmation
+  display.clear();
+  display.home();
   display.print(getStringFormat(MenuMode));
   display.println(runMode);
   display.print(getStringFormat(MenuStep));
@@ -2969,17 +3068,21 @@ void setup()
   display.println();
   display.println();
   display.println(getStringFormat(MenuNormal));
-  display.display();
+  display.update();
   while (1)
   {
     if (isBtn4() && (unsigned long)millis() - btnTiming > delaybutton)
       break;
   }
+  // start running
   log(F("run"));
+  // save last config
   setLastMode();
+  // variable initialization
   nFunc = 0;
   mStep = -1;
   startTime = millis();
+  // run mode
   switch (runMode)
   {
   case 1:
@@ -2992,16 +3095,18 @@ void setup()
     mode3();
     break;
   }
+  // show total time
   char tf[15] = {0};
   dtostrf((millis() - startTime) / 1000.0, 10, 3, tf);
   char d[InfoYourTime.length + 10] = {0};
   sprintf(d, getStringFormat(InfoYourTime).c_str(), tf);
   log(d);
-
+  // finish sound
   buzzer(10, 50, 100);
 }
 
 void loop()
 {
+  // if any loop method from user
   customloop();
 }
