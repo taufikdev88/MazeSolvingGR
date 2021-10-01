@@ -21,6 +21,7 @@
  *     F1 -> Koneksi dengan husky lens terputus
  *     F2 -> Tidak ada pembelajaran sama sekali
  *     F3 -> Tidak ada objek yang di deteksi
+ * 
  */
 
 #include <Wire.h>
@@ -127,6 +128,25 @@ void readHuskyLens()
       Serial3.print('F');
     }
   }
+}
+
+/*
+ * Fungsi membaca qrcode dari GM66
+ */
+void readGM66(){
+  unsigned long timewait = millis();
+  bool fail = false;
+  while(!Serial1.available()){
+    if((unsigned long) millis()-timewait >= 1000){
+      fail = true;
+      break;
+    }
+  }
+  if(fail){
+    Serial3.print('N');
+    return;
+  }
+  Serial3.println(Serial1.readStringUntil('\n'));
 }
 
 /*
@@ -341,6 +361,9 @@ void loop()
         huskylens.writeAlgorithm(ALGORITHM_COLOR_RECOGNITION);
       }
       readHuskyLens();
+      break;
+    case 'G':
+      readGM66();
       break;
     }
   }
