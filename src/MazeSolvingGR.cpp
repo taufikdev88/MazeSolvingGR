@@ -139,9 +139,9 @@ float Kp = 2.0;
 float Kd = 0.0;
 float dError = 0.0;
 
-float KpMotor = 1.0;
-float KiMotor = 0.0;
-float KdMotor = 0.0;
+float KpMotor = 0.10;
+float KiMotor = 0.005;
+float KdMotor = 0.01;
 
 uint8_t leftPwmOffsetFwd = 0;
 uint8_t rightPwmOffsetFwd = 0;
@@ -580,7 +580,7 @@ String getStringFormat(StrFormat sf)
 void log(String l)
 {
   display.clear();
-  display.setCursor(0, 0);
+  display.setCursorXY(0, 0);
   display.print(runMode);
   display.print(F(" / "));
   switch (debugMode)
@@ -596,7 +596,7 @@ void log(String l)
     break;
   }
   display.println(getStringFormat(InfoDelimiter));
-  display.setCursor(0, 16);
+  display.setCursorXY(0, 16);
   mazeLog[0] = mazeLog[1];
   mazeLog[1] = l;
   display.println(mazeLog[0]);
@@ -606,7 +606,7 @@ void log(String l)
 void displayMenu()
 {
   display.clear();
-  display.setCursor(0, 0);
+  display.setCursorXY(0, 0);
   display.print(getStringFormat(MenuMode));
   display.println(runMode);
   display.print(getStringFormat(MenuStep));
@@ -628,7 +628,7 @@ void displayMenu()
   char d[InfoFrontSensor.length + 10] = {0};
   sprintf(d, "enc l:%d r:%d", counterL, counterR); // eepromflag
   display.println(d);
-  display.setCursor(0, 48);
+  display.setCursorXY(0, 48);
   readSensor(ff);
   sprintf(d, getStringFormat(InfoFrontSensor).c_str(), senData[0], senData[1], senData[2], senData[3], senData[4], senData[5], senData[6], senData[7], senData[8], senData[9]);
   display.println(d);
@@ -727,6 +727,112 @@ void errorRaised()
   }
   log(F("run"));
 }
+// error saat menggunakan avoider
+int16_t* sidelineError(bool supermode = false){
+  int16_t error = 0;
+  int16_t spd[2] = {0};
+  readSensor(iTF ? ff : bb);
+  uint16_t l = 0;
+  senData2Bin(&l);
+  bool center = false;
+  switch (l)
+  {
+  case 0b1000000000:
+    spd[1] = 35;
+    break;
+  case 0b1100000000:
+    spd[1] = 30;
+    break;
+  case 0b0100000000:
+    spd[1] = 25;
+    break;
+  case 0b0110000000:
+    spd[1] = 20;
+    break;
+  case 0b0010000000:
+    spd[1] = 15;
+    break;
+  case 0b0011000000:
+    spd[1] = 10;
+    break;
+  case 0b0001000000:
+    spd[1] = 5;
+    break;
+  case 0b0001100000:
+    spd[1] = 0;
+    center = true;
+    break;
+  case 0b0000100000:
+    spd[1] = 0;
+    center = true;
+    break;
+  case 0b0000010000:
+    spd[0] = 0;
+    center = true;
+    break;
+  case 0b0000011000:
+    spd[0] = 0;
+    center = true;
+    break;
+  case 0b0000001000:
+    spd[0] = 5;
+    break;
+  case 0b0000001100:
+    spd[0] = 10;
+    break;
+  case 0b0000000100:
+    spd[0] = 15;
+    break;
+  case 0b0000000110:
+    spd[0] = 20;
+    break;
+  case 0b0000000010:
+    spd[0] = 25;
+    break;
+  case 0b0000000011:
+    spd[0] = 30;
+    break;
+  case 0b0000000001:
+    spd[0] = 35;
+    break;
+  case 0b1000000001:
+  case 0b1100000001:
+  case 0b1000000011:
+  case 0b0000110000:
+  case 0b0001110000:
+  case 0b0000111000:
+  case 0b0001111000:
+  case 0b0011110000:
+  case 0b0000111100:
+  case 0b0011111100:
+  case 0b0111111000:
+  case 0b0001111110:
+  case 0b0111111110:
+  case 0b1111111110:
+  case 0b1111111100:
+  case 0b1111111000:
+  case 0b1111100000:
+  case 0b1111000000:
+  case 0b1110000000:
+  case 0b0000000111:
+  case 0b0000001111:
+  case 0b0000011111:
+  case 0b0000111111:
+  case 0b0001111111:
+  case 0b0011111111:
+  case 0b0111111111:
+  case 0b1111111111:
+    center = true;
+    break;
+  }
+  if (center)
+  {
+    spd[0] = 404;
+    spd[1] = 404;
+  }
+  return spd;
+}
+// follow left line
 int16_t leftlineError(bool supermode = false)
 {
   int16_t error = 0;
@@ -1078,7 +1184,7 @@ void detectorRun(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, 
   bool crossDetected = false;
   int8_t side = none;
   iED = false;
-
+  cleanSensor();
   unsigned long timeStart = millis();
   while (!crossDetected)
   {
@@ -1761,105 +1867,8 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
     spdl = constrain(spdl, -255, 255);
     spdr = constrain(spdr, -255, 255);
 
-    readSensor(iTF ? ff : bb);
-    uint16_t line = 0;
-    senData2Bin(&line);
-    bool center = false;
-    switch (line)
-    {
-    case 0b1000000000:
-      spdr = 35;
-      break;
-    case 0b1100000000:
-      spdr = 30;
-      break;
-    case 0b0100000000:
-      spdr = 25;
-      break;
-    case 0b0110000000:
-      spdr = 20;
-      break;
-    case 0b0010000000:
-      spdr = 15;
-      break;
-    case 0b0011000000:
-      spdr = 10;
-      break;
-    case 0b0001000000:
-      spdr = 5;
-      break;
-    case 0b0001100000:
-      spdr = 0;
-      center = true;
-      break;
-    case 0b0000100000:
-      spdr = 0;
-      center = true;
-      break;
-    case 0b0000010000:
-      spdl = 0;
-      center = true;
-      break;
-    case 0b0000011000:
-      spdl = 0;
-      center = true;
-      break;
-    case 0b0000001000:
-      spdl = 5;
-      break;
-    case 0b0000001100:
-      spdl = 10;
-      break;
-    case 0b0000000100:
-      spdl = 15;
-      break;
-    case 0b0000000110:
-      spdl = 20;
-      break;
-    case 0b0000000010:
-      spdl = 25;
-      break;
-    case 0b0000000011:
-      spdl = 30;
-      break;
-    case 0b0000000001:
-      spdl = 35;
-      break;
-    case 0b1000000001:
-    case 0b1100000001:
-    case 0b1000000011:
-    case 0b0000110000:
-    case 0b0001110000:
-    case 0b0000111000:
-    case 0b0001111000:
-    case 0b0011110000:
-    case 0b0000111100:
-    case 0b0011111100:
-    case 0b0111111000:
-    case 0b0001111110:
-    case 0b0111111110:
-    case 0b1111111110:
-    case 0b1111111100:
-    case 0b1111111000:
-    case 0b1111100000:
-    case 0b1111000000:
-    case 0b1110000000:
-    case 0b0000000111:
-    case 0b0000001111:
-    case 0b0000011111:
-    case 0b0000111111:
-    case 0b0001111111:
-    case 0b0011111111:
-    case 0b0111111111:
-    case 0b1111111111:
-      center = true;
-      break;
-    }
-    if (center)
-    {
-      kinematik(0, 0);
-      break;
-    }
+
+
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
     delay(10);
   }
@@ -1924,75 +1933,11 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive
 
     spdl += outL;
     spdr += outR;
-
-    readSensor(iTF ? ff : bb);
-    uint16_t line = 0;
-    senData2Bin(&line);
-    bool center = false;
-    switch (line)
-    {
-    case 0b1000000000:
-      spdr = 35;
-      break;
-    case 0b1100000000:
-      spdr = 30;
-      break;
-    case 0b0100000000:
-      spdr = 25;
-      break;
-    case 0b0110000000:
-      spdr = 20;
-      break;
-    case 0b0010000000:
-      spdr = 15;
-      break;
-    case 0b0011000000:
-      spdr = 10;
-      break;
-    case 0b0001000000:
-      spdr = 5;
-      break;
-    case 0b0001100000:
-      spdr = 0;
-      break;
-    case 0b0000100000:
-      spdr = 0;
-      break;
-    case 0b0000010000:
-      spdl = 0;
-      break;
-    case 0b0000011000:
-      spdl = 0;
-      break;
-    case 0b0000001000:
-      spdl = 5;
-      break;
-    case 0b0000001100:
-      spdl = 10;
-      break;
-    case 0b0000000100:
-      spdl = 15;
-      break;
-    case 0b0000000110:
-      spdl = 20;
-      break;
-    case 0b0000000010:
-      spdl = 25;
-      break;
-    case 0b0000000011:
-      spdl = 30;
-      break;
-    case 0b0000000001:
-      spdl = 35;
-      break;
-    case 0b0001111000:
-      center = true;
-      break;
-    }
-    if (center)
-    {
-      // break;
-    }
+    
+    int16_t* s = sidelineError();
+    if(s[0] != 0 && s[0] != 404) spdl = s[0];
+    if(s[1] != 0 && s[1] != 404) spdr = s[1];
+    if(s[0] == 404 && s[1] == 404) break;
 
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
     delay(5);
@@ -2934,7 +2879,7 @@ void showonlcd(String data)
   if (debugMode == by_func)
     waitKey4();
   display.clear();
-  display.setCursor(0, 0);
+  display.setCursorXY(0, 0);
   display.print(data);
   display.update();
 }
