@@ -8,6 +8,7 @@ void initMazeRobot(){ // fungsi untuk inisialisasi
   sensor(ff); // gunakan sensor depan
   linecolor(black); // atur robot untuk memulai dengan garis berwarna hitam
   pid1(); // kp dan kd default untuk sensor garis (tersedia pid1() ~ pid7() ) gunakan perintah controller(kp, kd) untuk custom sendiri
+  motorPid1();
 }
 
 void mode1(){
