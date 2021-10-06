@@ -1,6 +1,8 @@
 #include "MazeSolvingGR.h"
 /*
  * String format addressing and length
+ * nama nama fungsi disimpan di eeprom, hanya disimpan alamat eepromnya dan panjang karakter
+ * hanya di ambil saat user memilih debug: byfunc / bystep
  */
 struct StrFormat
 {
@@ -91,8 +93,9 @@ const StrFormat InfoLineMissing{1285, 12};
 /*
  * EEPROM ADDRESSING
  */
+// alamat eeprom untuk menyimpan mode terakhir yang digunakan user
 #define ModeAddr 0x10000
-
+// pinout di arduino untuk input output
 #define pwm1 PB8
 #define pwm2 PB9
 #define pwm3 PB0
@@ -102,7 +105,7 @@ const StrFormat InfoLineMissing{1285, 12};
 #define btn2 PB3
 #define btn3 PB5
 #define btn4 PB4
-
+// aliasing / mirip seperti global variable
 #define delaybuzzer 50
 #define delaybutton 200
 #define fsensor Serial1
@@ -112,47 +115,48 @@ const StrFormat InfoLineMissing{1285, 12};
 #define leftSide 0
 #define rightSide 1
 #define sideAvoidance 0
-
-bool iUB = true;  // is use buzzer
-bool iUE = true;  // is use error
-bool iTF = true;  // is trace forward
-bool iED = false; // is error detected
-bool iMC = true;  // is mode count
-
+// variable global untuk menyimpan konfig user
+bool iUB = true;  // is use buzzer, apakah user mau menggunakan buzzer
+bool iUE = true;  // is use error, apakah user mau menggunakan mode error
+bool iTF = true;  // is trace forward, apakah mode yang dipilih user adalah maju / mundur
+bool iED = false; // is error detected, menyimpan apakah robot mendeteksi error(robot tidak mendeteksi garis/keluar dari garis)
+bool iMC = true;  // is mode count, ini untuk setup robot pertama kali untuk menghitung jumlah step yang disetting user
+// variable penyimpan jumlah fungsi, jumlah setpoin 
 int16_t nFunc = 0;
 int16_t nStep = 0;
 int16_t mStep = 0;
-int8_t runMode = 1;
-int8_t debugMode = 0;
+int8_t runMode = 1; // variable penyimpan mode yang digunakan user
+int8_t debugMode = 0; // variable penyimpan mode debug yg dipakai user, apakah no_debug/by_func/by_step
 #define no_debug 0
 #define by_func 1
 #define by_step 2
-
-unsigned long errorStart = 0;
-unsigned long startTime = 0;
-unsigned long btnTiming = 0;
+// variable penyimpang timing
+unsigned long errorStart = 0; // menyimpan waktu pertama kali robot tidak mendeteksi garis
+// todo: tambahi logika penyimpan start time ke eeprom agar tidak menghitung ulang jika user langsung memilih setpoin selain 0
+unsigned long startTime = 0; // menyimpan robot mulai jalan untuk dihitung berapa lama robot dari start menuju finish
+unsigned long btnTiming = 0; // debounce button agar tidak mencet terus menerus
 uint16_t maxErrorTime = 100; // flag untuk mengatur lamanya robot menuju error saat tidak mendeteksi garis
 uint16_t pcTime = 100;       // flag untuk timer percabangan
 uint16_t stepDelayTime = 0;  // timer untuk delay dari step menuju fungsi berikutnya
 
-float Kp = 2.0;
-float Kd = 0.0;
-float dError = 0.0;
+float Kp = 2.0; // Kp pid sensor garis
+float Kd = 0.0; // Kd pid sensor garis
+float dError = 0.0; // penyimpan error d sensor garis
 
-float KpMotor = 0.10;
-float KiMotor = 0.005;
-float KdMotor = 0.01;
+float KpMotor = 0.10; // Kp pid kontrol kecepatan motor
+float KiMotor = 0.005; // Ki pid kontrol kecepatan motor
+float KdMotor = 0.01; // Kd pid kontrol kecepatan motor
 
-uint8_t leftPwmOffsetFwd = 0;
-uint8_t rightPwmOffsetFwd = 0;
-uint8_t leftPwmOffsetBwd = 0;
-uint8_t rightPwmOffsetBwd = 0;
+uint8_t leftPwmOffsetFwd = 0; // menyimpan offset pwm motor kiri saat maju 
+uint8_t rightPwmOffsetFwd = 0; // menyimpan offset pwm motor kanan saat maju
+uint8_t leftPwmOffsetBwd = 0; // menyimpan offset pwm motor kiri saat mundur
+uint8_t rightPwmOffsetBwd = 0; // menyimpan offset pwm motor kanan saat mundur
 
-float heading = 0;
+float heading = 0; // variable penyiman sudut heading robot  
 
-bool senData[10] = {0};
-String mazeLog[2];
-struct PacketHusky
+bool senData[10] = {0}; // variable penyimpan nilai sensor
+String mazeLog[2]; // variable penyimpan log fungsi, hanya digunakan saat mode debug by_func/by_step
+struct PacketHusky // struktur paket yang diterima dari fungsi parsing data dari husky lens
 {
   uint16_t xa = 0;
   uint16_t xb = 0;
@@ -160,7 +164,7 @@ struct PacketHusky
   uint16_t yb = 0;
   int8_t id = 0;
 };
-struct PacketRaspi 
+struct PacketRaspi // struktur paket yang diterima dari fungsi parsing data dari raspberry pi
 {
   uint16_t x = 0;
   uint16_t y = 0;
@@ -169,7 +173,10 @@ struct PacketRaspi
   String data = "";
 };
 
-Adafruit_PWMServoDriver srv = Adafruit_PWMServoDriver();
+Adafruit_PWMServoDriver srv = Adafruit_PWMServoDriver(); // objek untuk mengakses servo driver
+/*
+ * objek untuk mengakses driver oled
+ */
 //GyverOLED<SSD1306_128x32, OLED_BUFFER> display;
 //GyverOLED<SSD1306_128x32, OLED_NO_BUFFER> display;
 //GyverOLED<SSD1306_128x64, OLED_BUFFER> display;
@@ -179,18 +186,21 @@ GyverOLED<SSH1106_128x64> display;
 // atau bisa langsung passing alamat: GyverOLED display(0x3C);
 
 // **************************************************************************** interrupt service
-volatile uint32_t counterL = 0;
-volatile uint32_t counterR = 0;
-unsigned long lastTimeL = 0;
-unsigned long lastTimeR = 0;
-void pulseCountL()
+volatile uint32_t counterL = 0; // variable untuk menampung jumlah interrupt yang dihasilkan oleh encoder motor kiri
+volatile uint32_t counterR = 0; // variable untuk menampung jumlah interrupt yang dihasilkan oleh encoder motor kanan
+unsigned long lastTimeL = 0; // variable untuk menyimpan waktu terakhir dilakukan penghitungan rpm kiri
+unsigned long lastTimeR = 0; // variable untuk menyimpan waktu terakhir dilakukan penghitungan rpm kanan
+void pulseCountL() // fungsi yang dijalankan saat interrupt motor kiri aktif
 {
   counterL++;
 }
-void pulseCountR()
+void pulseCountR() // fungsi yang dijalankan saat interrupt motor kanan aktif , fungsi ini diinisialisasi di void setup
 {
   counterR++;
 }
+/*
+ * fungsi menghitung rpm motor kiri
+ */
 float getRPML()
 {
   detachInterrupt(digitalPinToInterrupt(PA0));
@@ -201,6 +211,9 @@ float getRPML()
   attachInterrupt(digitalPinToInterrupt(PA0), pulseCountL, RISING);
   return rpm;
 }
+/*
+ * fungsi menghitung rpm motor kanan
+ */
 float getRPMR()
 {
   detachInterrupt(digitalPinToInterrupt(PA1));
@@ -213,10 +226,23 @@ float getRPMR()
 }
 // **********************************************************************************************
 // *************************************************************** communicate with sensor module
+/*
+ * fungsi yang digunakan untuk update variable heading robot dengan membaca data imu
+ */
 void imusense()
 {
   // not implemented
 }
+/*
+ * fungsi parsing paket husky
+ * 
+ * contoh penggunaan:
+ * siapkan variable paket dahulu untuk menampung hasil parsingan dan isi dengan nilai yang dihasilkan oleh fungsi ini
+ * ws -> which sensor (ff/bb) ff=front, bb=back
+ * md -> mode (C/Q/L) C=color, Q=QrCode, L=Line
+ * 
+ * PacketHusky paket = readHusky(ff, C)
+ */
 PacketHusky readHusky(bool ws, char md)
 {
   HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
@@ -321,6 +347,15 @@ PacketHusky readHusky(bool ws, char md)
   }
   return p;
 }
+/*
+ * Fungsi yang digunakan untuk membaca paket dari raspberry pi
+ *
+ * ws -> which sensor (ff/bb) ff=front, bb=back
+ * timeout -> isi berapa mili detik maksimal menunggu paket datang dari raspberry pi, jika timeout tercapai sebelum menerima paket maka isinya akan 0 semua
+ * 
+ * PacketRaspi paket = readRaspi(ff)
+ * PacketRaspi packetrasp = readRaspi(ff, 2000)
+ */
 PacketRaspi readRaspi(bool ws, uint16_t timeout = 1100)
 {
   HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
@@ -411,6 +446,9 @@ PacketRaspi readRaspi(bool ws, uint16_t timeout = 1100)
   }
   return p;
 }
+/*
+ * fungsi untuk membersihkan buffer yang ada di serial biar tidak terjadi kesalahan parsing untuk fungsi yang akan dijalankan
+ */
 void cleanSensor()
 {
   while (fsensor.available())
@@ -422,6 +460,21 @@ void cleanSensor()
     rsensor.read();
   }
 }
+/*
+ * fungsi untuk membaca nilai sensor, senData[] akan terupdate sesuai dengan kondisi sensor
+ * untuk merubah senData[] yang berupa array ke tipe data yang bisa di switch case maka gunakan fungsi senData2Bin dengan menyiapkan variable
+ * penampung, contoh:
+ * 
+ * readSensor(ff); // membaca sensor depan dan otomatis variable senData akan terupdate
+ * uint16_t line; // menyiapkan variable penampung data biner untuk dilakukan switch case
+ * senData2Bin(&line); // memasukkan array senData ke variable line 
+ * 
+ * setelah fungsi diatas bisa digunakan untuk switch case kondisi sensor
+ * switch(line){
+ *  case 0b000011111: error = 1; break;
+ * }
+ * 
+ */
 void readSensor(bool ws)
 {
   HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
@@ -476,6 +529,17 @@ void readSensor(bool ws)
 }
 // **********************************************************************************************
 // **************************************************************************** board interaction
+/*
+ * fungsi membaca input button dari board , gunakan shortcut isBtn1() untuk membaca button 1 atau kalau pengen sendiri membaca tombol di
+ * pin yang diinginkan gunakan fungsi readBtn, contoh:
+ * 
+ * if(readBtn(15)){
+ *  kinematik(100,100);
+ * }
+ * if(isBtn1()){
+ *  kinematik(50,50);
+ * }
+ */
 #define isBtn1() readBtn(btn1)
 #define isBtn2() readBtn(btn2)
 #define isBtn3() readBtn(btn3)
@@ -497,6 +561,14 @@ bool readBtn(uint8_t p)
   }
   return false;
 }
+/*
+ * gunakan fungsi ini disetiap akhir fungsi yang dijalankan oleh user, yang menandakan pergantian fungsi
+ * fungsi ini sudah dilengkapi dengan pengecekan apakah user mengaktifkan buzzer / mematikan buzzer
+ * 
+ * useBuzzerOn();
+ * *beberapa fungsi didalam sini 
+ * useBuzzerOff();
+ */
 void useBuzzerOn()
 {
   if (iUB)
@@ -513,6 +585,10 @@ void useBuzzerOff()
     digitalWrite(LED_BUILTIN, 0);
   }
 }
+/*
+ * perlakuan khusus untuk button 4 / button yang kami anggap sebagai button go, saat ini digunakan untuk menunggu user memencet tombol go
+ * saat user menggunakan mode debug by_func/by_step
+ */
 void waitKey4()
 {
   if (debugMode == by_func)
@@ -526,6 +602,11 @@ void waitKey4()
     digitalWrite(buzz, 0);
   }
 }
+/*
+ * menyimpan sebuah nilai byte(8 bit data/dalam desimal adalah 255) ke eeprom
+ *
+ * a = address, d = data
+ */
 void writeByteEEPROM(uint32_t a, byte d)
 {
   if (a > 0x1FFFE)
@@ -544,6 +625,11 @@ void writeByteEEPROM(uint32_t a, byte d)
   Wire.write(d);
   Wire.endTransmission();
 }
+/*
+ * mengambil nilai dari alamat eeprom
+ *
+ * a = address
+ */
 byte readByteEEPROM(uint32_t a)
 {
   if (a > 0x1FFFE)
@@ -568,6 +654,17 @@ byte readByteEEPROM(uint32_t a)
   }
   return data;
 }
+/*
+ * fungsi untuk mengambil nama fungsi yang tersimpan di eeprom
+ * penggunaan fungsi ini berguna agar tidak terlalu banyak mendefinisikan string di dalam flash agar tidak membuang memory flash hanya untuk
+ * menyimpan nama fungsi
+ * 
+ * StrFormat yang bisa digunakan ada di atas sendiri dan akan mengembalikan string yang tersimpan
+ * contoh:
+ * sprintf(d, getStringFormat(InfoFF).c_str(), senData[0], senData[1], ... ,senData[9]);
+ * display.println(d);
+ * 
+ */
 String getStringFormat(StrFormat sf)
 {
   String r = "";
@@ -577,6 +674,9 @@ String getStringFormat(StrFormat sf)
   }
   return r;
 }
+/*
+ * fungsi untuk menampikan karakter ke display dan tetap menyimpan 2 log terakhir yang dikirim untuk ditampilkan ke user
+ */
 void log(String l)
 {
   display.clear();
@@ -603,6 +703,9 @@ void log(String l)
   display.println(mazeLog[1]);
   display.update();
 }
+/*
+ * Tampilan menu awal untuk user memilih mode, memilih setpoint dan memilih tipe debugging
+ */
 void displayMenu()
 {
   display.clear();
@@ -639,14 +742,23 @@ void displayMenu()
 }
 // **********************************************************************************************
 // *********************************************************************************** robot data
+/*
+ * fungsi mengambil mode terakhir yang digunakan oleh user
+ */
 void getLastMode()
 {
   runMode = constrain(readByteEEPROM(ModeAddr), 1, 3);
 }
+/*
+ * fungsi menyimpan mode terakhir yang digunakan oleh user, hanya digunakan di void setup()
+ */
 void setLastMode()
 {
   writeByteEEPROM(ModeAddr, runMode);
 }
+/*
+ * fungsi menghitung total setpoin disetiap mode, hanya digunakan di void setup()
+ */
 void countSetPoint()
 {
   mStep = -1;
@@ -666,6 +778,9 @@ void countSetPoint()
   }
   iMC = false;
 }
+/*
+ * fungsi mengubah array senData menjadi data yang bisa digunakan untuk switch case
+ */
 void senData2Bin(uint16_t *l)
 {
   if (senData[0]) *l = *l | 0b1000000000;
@@ -681,6 +796,13 @@ void senData2Bin(uint16_t *l)
 }
 // **********************************************************************************************
 // *********************************************************************************** robot move
+/*
+ * fungsi untuk menggerakkan motor kiri dan kanan
+ *
+ * ls = leftspeed, rs = rightspeed
+ * jika positif motor akan berputar maju
+ * jika negatif motor akan berputar mundur
+ */
 void kinematik(int16_t ls, int16_t rs)
 {
   ls = constrain(ls, -255, 255);
@@ -709,6 +831,12 @@ void kinematik(int16_t ls, int16_t rs)
     analogWrite((iTF ? pwm4 : pwm2), 0);
   }
 }
+/*
+ * fungsi untuk menahan robot agar berhenti saat robot kehilangan garis
+ *
+ * fungsi ini hanya aktif jika user mengaktifkan error dan tidak semua fungsi lain menggunakan fungsi ini
+ * karena robot juga perlu suatu saat berjalan tanpa melewati garis
+ */
 void errorRaised()
 {
   kinematik(0, 0);
@@ -727,6 +855,15 @@ void errorRaised()
   }
   log(F("run"));
 }
+/*
+ * fungsi untuk injek/mengubah kecepatan motor kiri dan kanan saat mendeteksi garis di sensor
+ * gunanya agar robot tetap menghindari garis, contoh:
+ * 
+ * int16_t *spd = sidelineError();
+ * 
+ * spd[0] = adalah nilai kecepatan motor kiri yang didapatkan dari sidelineError
+ * spd[1] = adalah nilai kecepatan motor kanan yang didapatkan dari sidelineError
+ */
 // error saat menggunakan avoider
 int16_t* sidelineError(bool supermode = false){
   int16_t error = 0;
@@ -832,6 +969,10 @@ int16_t* sidelineError(bool supermode = false){
   }
   return spd;
 }
+/*
+ * fungsi untuk mendapatkan nilai error saat mode mengikuti garis dengan referensi sensor paling kiri
+ * nilai error ini digunakan untuk input error pid
+ */
 // follow left line
 int16_t leftlineError(bool supermode = false)
 {
@@ -942,6 +1083,10 @@ int16_t leftlineError(bool supermode = false)
   }
   return error;
 }
+/*
+ * fungsi untuk mendapatkan nilai error saat mode mengikuti garis dengan referensi sensor paling kanan
+ * nilai error ini digunakan untuk input error pid
+ */
 int16_t rightlineError(bool supermode = false)
 {
   readSensor(iTF ? ff : bb);
@@ -1037,6 +1182,10 @@ int16_t rightlineError(bool supermode = false)
   }
   return error;
 }
+/*
+ * fungsi ini akan mengaktifkan pid sensor agar robot mengikuti garis terus menerus
+ * fungsi ini digunakan di beberapa fungsi lain seperti detectorRun, lineDelay, dll
+ */
 void controllerRun(uint16_t line, int16_t speed, bool useError = true)
 {
   int16_t pwm = 0;
@@ -1159,6 +1308,10 @@ void controllerRun(uint16_t line, int16_t speed, bool useError = true)
   int16_t spdr = speed - pwm;
   kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
 }
+/*
+ * fungsi ini digunakan untuk robot setelah selesai menjalankan fungsi line, lined, linet, linedelay apakah mau maju sedikit atau mundur sedikit
+ * tujuannya adalah untuk mengoreksi posisi robot
+ */
 void backBrakeTimeFunc(int16_t speed, int16_t brakeTime, bool useError = true)
 {
   unsigned long timeStart = millis();
@@ -1176,6 +1329,11 @@ void backBrakeTimeFunc(int16_t speed, int16_t brakeTime, bool useError = true)
   }
   kinematik(0, 0);
 }
+/*
+ * fungsi ini adalah fungsi yang menjalankan logika pendeteksian percabangan, pendeteksian pertigaan, perempatan dan implementasi
+ * ke arah mana robot akan menghadap setelah mendeteksi percabangan
+ * fungsi ini digunakan oleh beberapa fungsi lain seperti lineFunc, linetFunc
+ */
 void detectorRun(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime)
 {
   unsigned long detectTime1 = millis();
@@ -1422,14 +1580,23 @@ void detectorRun(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, 
 }
 // **********************************************************************************************
 // *************************************************************************** interface function
+/*
+ * fungsi dasar tanpa log dan fungsi ini digunakan oleh beberapa fungsi lain seperti line, timeline, dll
+ */
 void lineFunc(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime)
 {
   detectorRun(method, dir, speed, brakeTime, -1);
 }
+/*
+ * fungsi dasar linet tanpa log, fungsi ini ada karena fungsi ini digunakan oleh beberapa fungsi lain seperti linet, linetline, timeline
+ */
 void linetFunc(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime)
 {
   detectorRun(method, dir, speed, brakeTime, actionTime);
 }
+/*
+ * fungsi dasar linedelay tanpa log, fungsi ini ada karena fungsi ini digunakan oleh beberapa fungsi lain seperti linedelay, linedline
+ */
 void linedelayFunc(int16_t speed, uint16_t runTime, int16_t brakeTime)
 {
   unsigned long timeStart = millis();
@@ -1446,6 +1613,9 @@ void linedelayFunc(int16_t speed, uint16_t runTime, int16_t brakeTime)
   kinematik(0, 0);
   useBuzzerOff();
 }
+/*
+ * fungsi dasar tanpa log, fungsi ini ada karena fungsi ini digunakan oleh beberapa fungsi lain seperti motorcm, motorcmdetectcolor
+ */
 void motorcmFunc(int16_t speed, uint16_t cm, uint16_t backBrakeTime, int8_t method = none)
 {
   uint32_t step = 15 * cm;
@@ -1475,6 +1645,10 @@ void motorcmFunc(int16_t speed, uint16_t cm, uint16_t backBrakeTime, int8_t meth
 }
 // **********************************************************************************************
 // ********************************************************************************* turning func
+/*
+ * fungsi dasar agar robot belok kearah yang ditentukan sampai sensor yang digunakan mendeteksi garis, fungsi ini digunalan oleh 
+ * beberapa fungsi lain seperti left, left1-left7, right, right10-right4
+ */
 void turn(bool dir, uint8_t sensor, int16_t speed, uint16_t brakeTime)
 {
   readSensor(iTF ? ff : bb);
@@ -1509,6 +1683,9 @@ void turn(bool dir, uint8_t sensor, int16_t speed, uint16_t brakeTime)
   kinematik(0, 0);
   useBuzzerOff();
 }
+/*
+ * fungsi dasar yang digunakan untuk memutar robot sampai hitungan encoder tercapai
+ */
 void turnenc(bool dir, uint16_t speed, uint16_t count, uint16_t backBrakeTime)
 {
   counterL = 0;
@@ -1541,7 +1718,11 @@ void turnenc(bool dir, uint16_t speed, uint16_t count, uint16_t backBrakeTime)
   useBuzzerOff();
 }
 // **********************************************************************************************
+//  dibawah ini merupakan fungsi-fungsi yang bisa digunakan oleh user
 // **********************************************************************************************
+/*
+ * fungsi yang digunakan untuk membunyikan buzzer (dan/atau) led beberapa kali sesuai interval yang diinginkan
+ */
 void buzzerled(bool useBuzzer, bool useLED, uint8_t numberOfTimes, uint16_t interval, uint16_t customOffTime)
 {
   if (iMC)
@@ -1588,6 +1769,12 @@ void buzzerled(bool useBuzzer, bool useLED, uint8_t numberOfTimes, uint16_t inte
   digitalWrite(buzz, 0);
   digitalWrite(LED_BUILTIN, 0);
 }
+/*
+ * fungsi yang digunakan untuk mengatur pcTime, yaitu perbedaan waktu minimal sensor kanan dan kiri dalam mendeteksi garis untuk menentukan bahwa 
+ * itu adalah percabangan, dan untuk mengatur apakah mau menggunakan buzzer atau tidak
+ * 
+ * iUB -> isUseBuzzer
+ */
 void start(bool b, uint16_t p)
 {
   if (iMC)
@@ -1595,6 +1782,9 @@ void start(bool b, uint16_t p)
   pcTime = p;
   iUB = b;
 }
+/*
+ * fungsi untuk mereset startTime 
+ */
 void resettimer()
 {
   if (iMC)
@@ -1612,6 +1802,9 @@ void resettimer()
     waitKey4();
   startTime = millis();
 }
+/*
+ * fungsi untuk mengubah nilai pcTime
+ */
 void pctimer(uint16_t pc)
 {
   if (iMC)
@@ -1623,6 +1816,9 @@ void pctimer(uint16_t pc)
     waitKey4();
   pcTime = pc;
 }
+/*
+ * fungsi untuk merubah warna garis yang digunakan
+ */
 void linecolor(bool color)
 {
   if (iMC)
@@ -1649,6 +1845,9 @@ void linecolor(bool color)
     rsensor.print('W');
   }
 }
+/*
+ * fungsi untuk merubah arah laju robot maju/atau mundur
+ */
 void sensor(bool dir)
 {
   if (iMC)
@@ -1673,6 +1872,10 @@ void sensor(bool dir)
     iTF = false;
   }
 }
+/*
+ * fungsi untuk mengatur apakah menggunakan error(robot akan berhenti saat tidak mendeteksi garis) dan waktu maksimal robot tidak mendeteksi garis
+ * jika robot sudah tidak mendeteksi garis lebih dari maxErrorTime maka robot akan berhenti dan membunyikan buzzer
+ */
 void error(bool useError, uint16_t time)
 {
   if (iMC)
@@ -1691,6 +1894,9 @@ void error(bool useError, uint16_t time)
   iUE = useError;
   maxErrorTime = time;
 }
+/*
+ * fungsi untuk mengatur Kp dan Kd pid sensor garis
+ */
 void controller(float customKp, float customKd)
 {
   Kp = constrain(customKp, 0.0, 100.0);
@@ -1714,6 +1920,9 @@ void controller(float customKp, float customKd)
     log(d);
   }
 }
+/*
+ * fungsi untuk mengatur Kp, Ki dan Kd pid kontrol rpm motors
+ */
 void motorController(float customKp, float customKi, float customKd)
 {
   KpMotor = customKp;
@@ -1728,6 +1937,9 @@ void motorController(float customKp, float customKi, float customKd)
   if (debugMode == by_func)
     waitKey4();
 }
+/*
+ * fungsi untuk menandai setpoin
+ */
 void step()
 {
   mStep++;
@@ -1748,6 +1960,10 @@ void step()
   }
   delay(stepDelayTime);
 }
+/*
+ * fungsi untuk mengatur robot berhenti disetpoin berapa lama
+ */
+// todo: implementasi pengaturan nilai stepdelaytime agar robot berhenti di setpoin sesuai waktu yang telah diatur
 void setstepdelay(uint16_t time)
 {
   if (iMC)
@@ -1757,6 +1973,9 @@ void setstepdelay(uint16_t time)
     return;
   nFunc++;
 }
+/* 
+ * fungsi untuk mengatur offset pwm motor saat maju agar seimbang kanan dan kiri
+ */
 void ffspeed(uint8_t l, uint8_t r)
 {
   if (iMC)
@@ -1775,6 +1994,9 @@ void ffspeed(uint8_t l, uint8_t r)
   leftPwmOffsetFwd = l;
   rightPwmOffsetFwd = r;
 }
+/*
+ * fungsi untuk mengatur offset pwm saat mundur agar seimbang kanan kiri
+ */
 void bbspeed(uint8_t l, uint8_t r)
 {
   if (iMC)
@@ -1793,6 +2015,9 @@ void bbspeed(uint8_t l, uint8_t r)
   leftPwmOffsetBwd = l;
   rightPwmOffsetBwd = 1;
 }
+/*
+ * fungsi untuk user memajukan / memundurkan robot selama waktu yang diatur tanpa membaca sensor garis
+ */
 void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime)
 {
   if (iMC)
@@ -1814,6 +2039,9 @@ void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime)
     kinematik(leftSpeed, rightSpeed);
   }
 }
+/*
+ * fungsi untuk membuat robot maju/mundur sejauh jarak cm yang diatur tanpa membaca sensor garis
+ */
 void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
 {
   if (iMC)
@@ -1825,6 +2053,9 @@ void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
     waitKey4();
   motorcmFunc(speed, cm, backBrakeTime);
 }
+/*
+ * fungsi untuk membuat robot maju/mundur dengan kecepatan rpm yang diatur selama waktu yang ditentukan tanpa membaca sensor garis
+ */
 void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
 {
   if (iMC)
@@ -1874,6 +2105,12 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
   }
   kinematik(0, 0);
 }
+/*
+ * fungsi untuk membuat robot maju/mundur dengan kecepatan yang diatur dan selama waktu yang telah ditentukan 
+ * jika robot mendeteksi warna (menggunakan huskylens) maka robot akan berhenti
+ * jika avoidActive diatur ke true, jika robot mendeteksi garis maka robot akan menghindari garis tersebut
+ * colorId adalah id warna yang telah diatur di husky lens
+ */
 int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive, int8_t colorId)
 {
   if (iMC)
@@ -1945,6 +2182,11 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive
   kinematik(0, 0);
   return colordetected;
 }
+/*
+ * fungsi untuk membuat robot maju dengan kecepatan tertentu selama waktu yang telah ditentukan
+ * jika robot mendeteksi qrcode maka robot akan berhenti walaupun runTime belum tercapai
+ * jika avoidActive maka robot akan selalu menghidari jika ada garis 
+ */
 String motorrpmdetectqr(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive)
 {
   if (iMC)
@@ -1956,6 +2198,9 @@ String motorrpmdetectqr(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive)
     waitKey4();
   // not implemented
 }
+/*
+ * robot akan bergerak maju/mundur sejauh jarak yang ditentukan dan menghindari garis
+ */
 void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
 {
   if (iMC)
@@ -1967,6 +2212,10 @@ void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
     waitKey4();
   motorcmFunc(speed, cm, backBrakeTime, sideAvoidance);
 }
+/*
+ * robot akan berjalan lurus dengan kecepatan yang telah diatur sejauh jarak yang ditentukan
+ * robot akan menjaga heading dengan threshold yang telah diatur
+ */
 void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t threshold = 2)
 {
   if (iMC)
@@ -2004,6 +2253,10 @@ void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t thresho
   }
   kinematik(0, 0);
 }
+/*
+ * robot menjalankan fungsi maze dengan mendeteksi percabangan, melakukan fungsi belok sesuai dir yang telah diatur
+ * dan berjalan dengan kecepatan yang telah diatur
+ */
 void line(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime)
 {
   if (iMC)
@@ -2227,6 +2480,11 @@ void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t ba
   backBrakeTimeFunc(speed, backBrakeTime);
   useBuzzerOff();
 }
+/*
+ * fungsi agar robot berjalan sesuai garis namun garis akan berada di sisi sebelah kiri
+ * robot dengan kecepatan yang telah diatur dan selama waktu yang telah ditentukan
+ * jika supermode aktif, maka robot akan sangat sensitif terhadap pertigaan 90 derajat
+ */
 void leftline(int16_t speed, uint16_t runtime, bool supermode)
 {
   if (iMC)
@@ -2251,6 +2509,10 @@ void leftline(int16_t speed, uint16_t runtime, bool supermode)
   }
   kinematik(0, 0);
 }
+/*
+ * fungsi agar robot mengikuti garis di sebelah kiri sensor dan berhenti saat mendeteksi qrcode
+ * fungsi ini akan mengembalikan isi qrcode yang terdeteksi
+ */
 String leftlinedetectqr(int16_t speed, uint16_t runtime, bool supermode)
 {
   if (iMC)
@@ -2281,6 +2543,11 @@ String leftlinedetectqr(int16_t speed, uint16_t runtime, bool supermode)
   kinematik(0, 0);
   return packet.data;
 }
+/*
+ * fungsi agar robot berjalan sesuai garis namun garis akan berada di sisi sebelah kanan
+ * robot dengan kecepatan yang telah diatur dan selama waktu yang telah ditentukan
+ * jika supermode aktif, maka robot akan sangat sensitif terhadap pertigaan 90 derajat
+ */
 void rightline(int16_t speed, uint16_t runtime, bool supermode)
 {
   if (iMC)
@@ -2305,6 +2572,9 @@ void rightline(int16_t speed, uint16_t runtime, bool supermode)
   }
   kinematik(0, 0);
 }
+/*
+ * robot akan berputar kekiri sampai sensor 2 mendeteksi garis
+ */
 void left(int16_t speed, uint16_t backBrakeTime)
 {
   if (iMC)
@@ -2441,6 +2711,9 @@ void left7(int16_t speed, uint16_t backBrakeTime)
     waitKey4();
   turn(leftSide, 6, speed, backBrakeTime);
 }
+/*
+ * robot akan berputar ke kiri sampai hitungan encoder yang diatur tercapai dengan kecepatan yang telah diatur
+ */
 void leftenc(int16_t speed, uint16_t count, uint16_t backBrakeTime)
 {
   if (iMC)
@@ -2588,6 +2861,9 @@ void right4(int16_t speed, uint16_t backBrakeTime)
     waitKey4();
   turn(rightSide, 3, speed, backBrakeTime);
 }
+/*
+ * robot akan berputar ke kanan sesuai dengan jumlah encoder yang diinginkan dengan kecepatan yang telah diatur
+ */
 void rightenc(int16_t speed, uint16_t count, uint16_t backBrakeTime)
 {
   if (iMC)
@@ -2599,6 +2875,10 @@ void rightenc(int16_t speed, uint16_t count, uint16_t backBrakeTime)
     waitKey4();
   turnenc(rightSide, speed, count, backBrakeTime);
 }
+/*
+ * robot akan berbelok sesuai sudut yang diinginkan
+ */
+// todo: implementasi kode ini dengan gabungan pembacaan imusense()
 void turnangle(int16_t angle)
 {
   if (iMC)
@@ -2687,6 +2967,9 @@ void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int
   kinematik(0, 0);
   useBuzzerOff();
 }
+/*
+ * fungsi untuk menggerakkan servo yang berada di pin yang telah diatur dengan sudut yang diinginkan
+ */
 void servo(uint8_t pin, uint16_t deg)
 {
   if (iMC)
@@ -2699,6 +2982,9 @@ void servo(uint8_t pin, uint16_t deg)
   uint16_t pulse = deg / 180.0 * 450 + 150;
   srv.setPWM(pin, 0, pulse);
 }
+/*
+ * fungsi bawaan untuk melakukan penjepitan benda dan mengangkat keatas
+ */
 void pickup(uint16_t timedelay)
 {
   if (iMC)
@@ -2713,6 +2999,9 @@ void pickup(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ * fungsi bawaan untuk melakukan pembukaan gripper 
+ */
 void placeup(uint16_t timedelay)
 {
   if (iMC)
@@ -2727,6 +3016,9 @@ void placeup(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ *
+ */
 void pickdn(uint16_t timedelay)
 {
   if (iMC)
@@ -2741,6 +3033,9 @@ void pickdn(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ *
+ */
 void placedn(uint16_t timedelay)
 {
   if (iMC)
@@ -2755,6 +3050,9 @@ void placedn(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ *
+ */
 void take(uint16_t timedelay)
 {
   if (iMC)
@@ -2775,6 +3073,9 @@ void take(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ *
+ */
 void put(uint16_t timedelay)
 {
   if (iMC)
@@ -2795,6 +3096,9 @@ void put(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ * fungsi bawaan untuk mengatur kamera menghadap ke kanan
+ */
 void camright(uint16_t timedelay)
 {
   if (iMC)
@@ -2809,6 +3113,9 @@ void camright(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ * fungsi bawaan untuk mengatur kamera menghadap ke depan
+ */
 void camfront(uint16_t timedelay)
 {
   if (iMC)
@@ -2823,6 +3130,9 @@ void camfront(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ * fungsi bawaan untuk mengatur kamera menghadap ke kiri
+ */
 void camleft(uint16_t timedelay)
 {
   if (iMC)
@@ -2837,6 +3147,10 @@ void camleft(uint16_t timedelay)
   delay(timedelay);
   useBuzzerOff();
 }
+/*
+ * fungsi untuk mengambil warna yang dideteksi
+ * which sensor diisi dengan (ff/bb) sesuai dengan disensor mana huskylens disambungkan
+ */
 uint8_t camdetectcolor(bool whichSensor)
 {
   if (iMC)
@@ -2850,6 +3164,9 @@ uint8_t camdetectcolor(bool whichSensor)
   packet = readHusky(whichSensor, 'C');
   return packet.id;
 }
+/*
+ * fungsi untuk mengambil nilai qrcode yang dideteksi dan menggunakan modul raspberrypi
+ */
 String raspidetectqr(bool whichSensor, int8_t t)
 {
   if (iMC)
@@ -2869,6 +3186,9 @@ String raspidetectqr(bool whichSensor, int8_t t)
   }
   return packet.data;
 }
+/*
+ * fungsi bawaan jika anda ingin data anda (apapun itu) tampil di lcd
+ */
 void showonlcd(String data)
 {
   if (iMC)
@@ -2883,6 +3203,9 @@ void showonlcd(String data)
   display.print(data);
   display.update();
 }
+/*
+ * fungsi pengganti fungsi delay agar robot tidak seperti hang saat boot up
+ */
 void delay_maze(uint32_t delayMilli)
 {
   if (iMC)
@@ -2940,11 +3263,12 @@ void setup()
   getLastMode();
   countSetPoint();
   buzzer(3, 50, 100);
-  // main menu
+  // main menu pemilihan mode, setpoin, dan debugging
   unsigned long lcdTiming = millis();
   btnTiming = millis();
   while (1)
   {
+    // jika button1 ditekan, maka akan mengganti mode dari 1-3
     if (isBtn1() && (unsigned long)millis() - btnTiming > delaybutton)
     {
       digitalWrite(buzz, 1);
@@ -2955,6 +3279,8 @@ void setup()
       delay(delaybuzzer);
       digitalWrite(buzz, 0);
     }
+    // jika button2 ditekan, maka akan mengganti setpoin sesuai dengan jumlah
+    // setpoin yang telah ditambahkan oleh user di masing-masing mode
     if (isBtn2() && (unsigned long)millis() - btnTiming > delaybutton)
     {
       digitalWrite(buzz, 1);
@@ -2964,6 +3290,8 @@ void setup()
       delay(delaybuzzer);
       digitalWrite(buzz, 0);
     }
+    // jika button3 ditekan maka akan mengganti debugging mode antara
+    // no_debug, by_func dan by_step
     if (isBtn3() && (unsigned long)millis() - btnTiming > delaybutton)
     {
       digitalWrite(buzz, 1);
@@ -2973,6 +3301,7 @@ void setup()
       delay(delaybuzzer);
       digitalWrite(buzz, 0);
     }
+    // jika button4 ditekan maka user akan menjalankan robot sesuai mode, setpoin dan debugging yang telah diatur
     if (isBtn4() && (unsigned long)millis() - btnTiming > delaybutton)
     {
       digitalWrite(buzz, 1);
@@ -2981,6 +3310,7 @@ void setup()
       digitalWrite(buzz, 0);
       break;
     }
+    // timing lcd agar lcd tidak error
     if ((unsigned long)millis() - lcdTiming > delaybuzzer)
     {
       displayMenu();
