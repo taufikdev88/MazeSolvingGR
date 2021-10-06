@@ -12,7 +12,7 @@ void initMazeRobot(){ // fungsi untuk inisialisasi
 }
 
 void mode1(){
-  step(); // setpoint 0 -> garis start
+  step(); // setpoint 0 -> garis start  // penting jangan dihapus
   linefind(5,5,500);
   line(pp,ff,5,0);
   step(); // setpoint 1 
@@ -23,14 +23,14 @@ void mode1(){
 };
 
 void mode2(){
-  step();
+  step(); // penting jangan dihapus
   lostline(100,10,10,0);
   step();
   line(pp,ff,5,0);
 };
 
 void mode3(){
-  step();
+  step(); // penting jangan dihapus
   linedelay(20,20000,0);
   buzzer(3,200,200);
   led(10, 500, 50);
