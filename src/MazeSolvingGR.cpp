@@ -133,6 +133,7 @@ int8_t debugMode = 0; // variable penyimpan mode debug yg dipakai user, apakah n
 // variable penyimpang timing
 unsigned long errorStart = 0; // menyimpan waktu pertama kali robot tidak mendeteksi garis
 // todo: tambahi logika penyimpan start time ke eeprom agar tidak menghitung ulang jika user langsung memilih setpoin selain 0
+// todo: tambah comment
 unsigned long startTime = 0; // menyimpan robot mulai jalan untuk dihitung berapa lama robot dari start menuju finish
 unsigned long btnTiming = 0; // debounce button agar tidak mencet terus menerus
 uint16_t maxErrorTime = 100; // flag untuk mengatur lamanya robot menuju error saat tidak mendeteksi garis
