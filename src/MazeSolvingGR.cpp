@@ -225,6 +225,20 @@ float getRPMR()
   attachInterrupt(digitalPinToInterrupt(PA1), pulseCountR, RISING);
   return rpm;
 }
+/*
+ * fungsi untuk membersihkan buffer yang ada di serial biar tidak terjadi kesalahan parsing untuk fungsi yang akan dijalankan
+ */
+void cleanSensor()
+{
+  while (fsensor.available())
+  {
+    fsensor.read();
+  }
+  while (rsensor.available())
+  {
+    rsensor.read();
+  }
+}
 // **********************************************************************************************
 // *************************************************************** communicate with sensor module
 /*
@@ -252,6 +266,7 @@ PacketHusky readHusky(bool ws, char md)
   uint8_t pidx = 0;
   uint8_t pcnt = 0;
   String pstr = "";
+  cleanSensor();
   os->write(md);
   unsigned long timestart = millis();
   bool rto = false;
@@ -364,7 +379,8 @@ PacketRaspi readRaspi(bool ws, uint16_t timeout = 1100)
   uint8_t pidx = 0;
   uint8_t pcnt = 0;
   String pstr = "";
-  if(!os->available()) os->write('R');
+  cleanSensor();
+  os->write('R');
   unsigned long timestart = millis();
   bool rto = false;
   while (!os->available())
@@ -448,18 +464,38 @@ PacketRaspi readRaspi(bool ws, uint16_t timeout = 1100)
   return p;
 }
 /*
- * fungsi untuk membersihkan buffer yang ada di serial biar tidak terjadi kesalahan parsing untuk fungsi yang akan dijalankan
+ * fungsi untuk mengirim perintah ke modul sensor untuk membaca data qrcode yang didapat dari gm66 
  */
-void cleanSensor()
+String readGM66(bool ws)
 {
-  while (fsensor.available())
+  HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
+  cleanSensor();
+  os->write('G');
+  unsigned long timestart = millis();
+  bool fail = 1;
+  while(!os->available())
   {
-    fsensor.read();
+    if((unsigned long) millis()-timestart > 100) break;
   }
-  while (rsensor.available())
+  if (fail) return "";
+  uint8_t pcnt = 0;
+  String result = "";
+  while (os->available())
   {
-    rsensor.read();
+    char c = (char) os->read();
+    switch (pcnt)
+    {
+    case 1:
+      if (c == ';') continue;
+      break;
+    default:
+      result += c;
+      if (c == '\n' || c == '\r') break;
+      break;
+    }
   }
+  cleanSensor();
+  return result;
 }
 /*
  * fungsi untuk membaca nilai sensor, senData[] akan terupdate sesuai dengan kondisi sensor
@@ -3109,7 +3145,8 @@ void camright(uint16_t timedelay)
     return;
   if (debugMode == by_func)
     waitKey4();
-  servo(5, 35); // sesuaikan
+  servo(5, 35); // sesuaikan yaw
+  servo(6, 120); // sesuaikan pitch
   useBuzzerOn();
   delay(timedelay);
   useBuzzerOff();
@@ -3126,7 +3163,7 @@ void camfront(uint16_t timedelay)
     return;
   if (debugMode == by_func)
     waitKey4();
-  servo(5, 123); // sesuaikan
+  servo(5, 130); // sesuaikan
   useBuzzerOn();
   delay(timedelay);
   useBuzzerOff();
@@ -3152,7 +3189,7 @@ void camleft(uint16_t timedelay)
  * fungsi untuk mengambil warna yang dideteksi
  * which sensor diisi dengan (ff/bb) sesuai dengan disensor mana huskylens disambungkan
  */
-uint8_t camdetectcolor(bool whichSensor)
+uint8_t camdetectcolor(bool ws)
 {
   if (iMC)
     return 0;
@@ -3162,28 +3199,50 @@ uint8_t camdetectcolor(bool whichSensor)
   if (debugMode == by_func)
     waitKey4();
   PacketHusky packet;
-  packet = readHusky(whichSensor, 'C');
+  packet = readHusky(ws, 'C');
   return packet.id;
 }
 /*
- * fungsi untuk mengambil nilai qrcode yang dideteksi dan menggunakan modul raspberrypi
+ * fungsi untuk mengambil nilai qrcode yang dideteksi menggunakan modul gm66
  */
-String raspidetectqr(bool whichSensor, int8_t t)
+String gm66detectqr(bool ws, int8_t t)
 {
   if (iMC)
-    return "MODECOUNT";
+    return "MC";
   nFunc++;
   if (mStep < nStep)
-    return "SKIPSTEP";
+    return "SS";
+  if (debugMode == by_func)
+    waitKey4();
+  String qrcode = "";
+  while(qrcode == "" && t > 0)
+  {
+    qrcode = readGM66(ws);
+    showonlcd((String)t + ". " + qrcode);
+    t--;
+    if (qrcode == "") delay(1000);
+  }
+  return qrcode;
+}
+/*
+ * fungsi untuk mengambil nilai qrcode yang dideteksi menggunakan modul raspberrypi
+ */
+String raspidetectqr(bool ws, int8_t t)
+{
+  if (iMC)
+    return "MC";
+  nFunc++;
+  if (mStep < nStep)
+    return "SS";
   if (debugMode == by_func)
     waitKey4();
   PacketRaspi packet;
   while (packet.data == "" && t > 0)
   {
     t--;
-    packet = readRaspi(whichSensor);
+    packet = readRaspi(ws);
     showonlcd((String)t + ". " + packet.data);
-    delay(1000);
+    if (packet.data == "") delay(1000);
   }
   return packet.data;
 }

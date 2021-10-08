@@ -158,8 +158,10 @@ void camright(uint16_t timedelay);
 void camfront(uint16_t timedelay);
 void camleft(uint16_t timedelay);
 
-uint8_t camdetectcolor(bool whichSensor);
-String raspidetectqr(bool whichSensor, int8_t t);
+// ws -> which sensor (ff/bb) ff=front, bb=back 
+uint8_t camdetectcolor(bool ws);
+String gm66detectqr(bool ws, int8_t t);
+String raspidetectqr(bool ws, int8_t t);
 void showonlcd(String data);
 void delay_maze(uint32_t delayMilli);
 

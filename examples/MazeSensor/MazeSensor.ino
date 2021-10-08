@@ -143,7 +143,7 @@ void readGM66(){
     }
   }
   if(fail){
-    Serial3.print('N');
+    Serial3.print(';');
     return;
   }
   Serial3.println(Serial1.readStringUntil('\n'));
