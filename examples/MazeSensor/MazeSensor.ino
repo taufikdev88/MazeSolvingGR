@@ -51,6 +51,7 @@ bool isBlackLine = true;
 unsigned long timing = 0;
 bool flag = false;
 bool huskyready = false;
+bool gm66listen = false;
 char huskymode = 'L'; // Q,C,L
 
 HUSKYLENS huskylens;
@@ -128,25 +129,6 @@ void readHuskyLens()
       Serial3.print('F');
     }
   }
-}
-
-/*
- * Fungsi membaca qrcode dari GM66
- */
-void readGM66(){
-  unsigned long timewait = millis();
-  bool fail = false;
-  while(!Serial1.available()){
-    if((unsigned long) millis()-timewait >= 1000){
-      fail = true;
-      break;
-    }
-  }
-  if(fail){
-    Serial3.print(';');
-    return;
-  }
-  Serial3.println(Serial1.readStringUntil('\n'));
 }
 
 /*
@@ -363,11 +345,27 @@ void loop()
       readHuskyLens();
       break;
     case 'G':
-      readGM66();
+      gm66listen = true;
+      break;
+    case 'F':
+      gm66listen = false;
+      break;
+    case 'K':
+      Serial1.write('K');
       break;
     }
   }
 
+  if(gm66listen){
+    if(Serial1.available()){
+      Serial3.write(Serial1.read());
+    }
+  } else {
+    if(Serial1.available()){
+      Serial1.read();
+    }
+  }
+  
   if (flag == true)
   {
     if (readBtn(b0))
