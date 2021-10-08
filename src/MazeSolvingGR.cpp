@@ -178,13 +178,10 @@ Adafruit_PWMServoDriver srv = Adafruit_PWMServoDriver(); // objek untuk mengakse
 /*
  * objek untuk mengakses driver oled
  */
-//GyverOLED<SSD1306_128x32, OLED_BUFFER> display;
-//GyverOLED<SSD1306_128x32, OLED_NO_BUFFER> display;
-//GyverOLED<SSD1306_128x64, OLED_BUFFER> display;
-//GyverOLED<SSD1306_128x64, OLED_NO_BUFFER> display;
-//GyverOLED<SSD1306_128x64, OLED_BUFFER, OLED_SPI, 8, 7, 6> display;
+// GyverOLED<SSD1306_128x64, OLED_BUFFER> display;
+// GyverOLED<SSD1306_128x64, OLED_BUFFER, OLED_SPI, 8, 7, 6> display;
 GyverOLED<SSH1106_128x64> display;
-// atau bisa langsung passing alamat: GyverOLED display(0x3C);
+// atau bisa passing alamat: display(0x3C);
 
 // **************************************************************************** interrupt service
 volatile uint32_t counterL = 0; // variable untuk menampung jumlah interrupt yang dihasilkan oleh encoder motor kiri
@@ -462,40 +459,6 @@ PacketRaspi readRaspi(bool ws, uint16_t timeout = 1100)
     delay(1);
   }
   return p;
-}
-/*
- * fungsi untuk mengirim perintah ke modul sensor untuk membaca data qrcode yang didapat dari gm66 
- */
-String readGM66(bool ws)
-{
-  HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
-  cleanSensor();
-  os->write('G');
-  unsigned long timestart = millis();
-  bool fail = 1;
-  while(!os->available())
-  {
-    if((unsigned long) millis()-timestart > 100) break;
-  }
-  if (fail) return "";
-  uint8_t pcnt = 0;
-  String result = "";
-  while (os->available())
-  {
-    char c = (char) os->read();
-    switch (pcnt)
-    {
-    case 1:
-      if (c == ';') continue;
-      break;
-    default:
-      result += c;
-      if (c == '\n' || c == '\r') break;
-      break;
-    }
-  }
-  cleanSensor();
-  return result;
 }
 /*
  * fungsi untuk membaca nilai sensor, senData[] akan terupdate sesuai dengan kondisi sensor
@@ -3215,14 +3178,27 @@ String gm66detectqr(bool ws, int8_t t)
   if (debugMode == by_func)
     waitKey4();
   String qrcode = "";
-  while(qrcode == "" && t > 0)
+  bool fail = false;
+  HardwareSerial *os = (ws == ff ? &fsensor : &rsensor);
+  cleanSensor();
+  os->write('G');
+  while(!os->available() && t > 0)
   {
-    qrcode = readGM66(ws);
-    showonlcd((String)t + ". " + qrcode);
-    t--;
-    if (qrcode == "") delay(1000);
+    if(--t <= 0) fail = true;
+    delay(1000);
   }
-  return qrcode;
+  os->write('F');
+  if(fail == true)
+  {
+    return "";
+  }
+  else
+  {
+    qrcode = os->readStringUntil('\r');
+    cleanSensor();
+    os->write('K');
+    return qrcode;
+  }
 }
 /*
  * fungsi untuk mengambil nilai qrcode yang dideteksi menggunakan modul raspberrypi

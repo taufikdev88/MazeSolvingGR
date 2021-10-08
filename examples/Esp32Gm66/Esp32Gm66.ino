@@ -21,6 +21,7 @@ WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 
 unsigned long wifiTiming = millis();
+String lastDetectedQr = "";
 
 void reconnect(){
   while(!client.connected()){
@@ -66,6 +67,7 @@ void setup() {
 }
 
 void loop() {
+  // rutin cek koneksi wifi
   if((WiFi.status() != WL_CONNECTED) && (unsigned long) millis()-wifiTiming >= 5000){
     digitalWrite(27, 0);
     Serial.println(millis());
@@ -74,12 +76,12 @@ void loop() {
     digitalWrite(27, 1);
     wifiTiming = millis();
   }
-  
+  // rutin cek koneksi mqtt
   if(!client.connected()){
     reconnect();
   }
   client.loop();
-  
+  // rutin untuk menerima serial dari gm66 
   if(testSerial.available()>0){
     String data = "";
     while(testSerial.available() > 0){
@@ -87,8 +89,18 @@ void loop() {
       data += (char) testSerial.read();
       yield();
     }
-    client.publish(API_TOPIC, data.c_str());
+    lastDetectedQr = data;
     Serial.println(data);
     Serial2.println(data);
+  }
+  // terima perintah serial untuk command
+  if (Serial2.available())
+  {
+    char c = (char) Serial2.read();
+    switch (c){
+      case 'K':
+        client.publish(API_TOPIC, lastDetectedQr.c_str());
+        break;
+    }
   }
 }
