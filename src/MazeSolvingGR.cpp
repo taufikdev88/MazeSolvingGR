@@ -2042,6 +2042,20 @@ void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime)
 /*
  * fungsi untuk membuat robot maju/mundur sejauh jarak cm yang diatur tanpa membaca sensor garis
  */
+void motorcmavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
+{
+  if (iMC)
+   return;
+  nFunc++;
+  if (mStep < nStep)
+    return;
+  if (debugMode == by_func)
+    waitKey4();
+  motorcmFunc(speed, cm, backBrakeTime, sideAvoidance);
+}
+/*
+ * fungsi untuk membuat robot maju/mundur sejauh jarak cm yang diatur tanpa membaca sensor garis
+ */
 void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
 {
   if (iMC)
@@ -2098,7 +2112,15 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
     spdl = constrain(spdl, -255, 255);
     spdr = constrain(spdr, -255, 255);
 
-
+    int16_t* spd = sidelineError();
+    if (spd[0] == 404 && spd[1] == 404) // robot mendeteksi garis di tengah tengah sensor bisa jadi karena menabrak garis yang melintang di depannya
+    {
+      break;
+    }
+    if (spd[0] != 0)
+      spdl = spd[0];
+    if (spd[1] != 0)
+      spdr = spd[1];
 
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
     delay(10);
