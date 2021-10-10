@@ -98,58 +98,58 @@ void ffspeed(uint8_t l, uint8_t r);
 void bbspeed(uint8_t l, uint8_t r);
 
 void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime);
-void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
-void motorcmavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
-void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime);
-void motorrpmavoider(uint rpmSpeed, uint16_t runTime, uint16_t backBrakeTime);
+void motorcm(int16_t speed, uint16_t cm, uint16_t backbraketime);
+void motorcmavoider(int16_t speed, uint16_t cm, uint16_t backbraketime);
+void motorrpm(uint16_t speed, uint16_t runTime, uint16_t backbraketime);
+void motorrpmavoider(uint16_t speed, uint16_t runtime, uint16_t backbraketime);
 int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive, int8_t colorId);
 String motorrpmdetectqr(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive);
 
-void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime); // not implemented
+void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backbraketime); // not implemented
 void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t threshold); // not implemented
 
-void line(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime);
-void linet(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime);
-void timeline(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t totalActionTime);
+void line(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime);
+void linet(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime, uint16_t actionTime);
+void timeline(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime, uint16_t totalActionTime);
 
-void linedelay(int16_t speed, uint16_t runTime, int16_t backBrakeTime);
+void linedelay(int16_t speed, uint16_t runTime, int16_t backbraketime);
 void linefind(int16_t leftSpeed, int16_t rightSpeed, uint16_t timeToDisregardLine);
-void linedline(uint16_t runTime, uint16_t startSpeed, uint16_t method, uint16_t dir, uint16_t endSpeed, int16_t brakeTime);
-void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t brakeTime);
+void linedline(uint16_t runTime, uint16_t startSpeed, uint16_t method, uint16_t dir, uint16_t endSpeed, int16_t backbraketime);
+void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t backbraketime);
 
-void sline(uint8_t sensor, int16_t speed, int16_t backBrakeTime);
-void slineright(uint8_t sensor, int16_t speed, int16_t backBrakeTime);
-void slineleft(uint8_t sensor, int16_t speed, int16_t backBrakeTime);
-void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t backBrakeTime);
+void sline(uint16_t sensor, int16_t speed, int16_t backbraketime);
+void slineright(uint16_t sensor, int16_t speed, int16_t backbraketime);
+void slineleft(uint16_t sensor, int16_t speed, int16_t backbraketime);
+void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t backbraketime);
 
 void leftline(int16_t speed, uint16_t runtime, bool supermode = false);
 String leftlinedetectqr(int16_t speed, uint16_t runtime, bool supermode = false);
 void rightline(int16_t speed, uint16_t runtime, bool supermode = false);
 
-void left(int16_t speed, uint16_t backBrakeTime);
-void left1(int16_t speed, uint16_t backBrakeTime);
-void left2(int16_t speed, uint16_t backBrakeTime);
-void left3(int16_t speed, uint16_t backBrakeTime);
-void left4(int16_t speed, uint16_t backBrakeTime);
-void left5(int16_t speed, uint16_t backBrakeTime);
-void left6(int16_t speed, uint16_t backBrakeTime);
-void left7(int16_t speed, uint16_t backBrakeTime);
-void leftenc(int16_t speed, uint16_t count, uint16_t backBrakeTime);
+void left(int16_t speed, uint16_t backbraketime);
+void left1(int16_t speed, uint16_t backbraketime);
+void left2(int16_t speed, uint16_t backbraketime);
+void left3(int16_t speed, uint16_t backbraketime);
+void left4(int16_t speed, uint16_t backbraketime);
+void left5(int16_t speed, uint16_t backbraketime);
+void left6(int16_t speed, uint16_t backbraketime);
+void left7(int16_t speed, uint16_t backbraketime);
+void leftenc(int16_t speed, uint16_t count, uint16_t backbraketime);
 
-void right(int16_t speed, uint16_t backBrakeTime);
-void right10(int16_t speed, uint16_t backBrakeTime);
-void right9(int16_t speed, uint16_t backBrakeTime);
-void right8(int16_t speed, uint16_t backBrakeTime);
-void right7(int16_t speed, uint16_t backBrakeTime);
-void right6(int16_t speed, uint16_t backBrakeTime);
-void right5(int16_t speed, uint16_t backBrakeTime);
-void right4(int16_t speed, uint16_t backBrakeTime);
-void rightenc(int16_t speed, uint16_t count, uint16_t backBrakeTime);
+void right(int16_t speed, uint16_t backbraketime);
+void right10(int16_t speed, uint16_t backbraketime);
+void right9(int16_t speed, uint16_t backbraketime);
+void right8(int16_t speed, uint16_t backbraketime);
+void right7(int16_t speed, uint16_t backbraketime);
+void right6(int16_t speed, uint16_t backbraketime);
+void right5(int16_t speed, uint16_t backbraketime);
+void right4(int16_t speed, uint16_t backbraketime);
+void rightenc(int16_t speed, uint16_t count, uint16_t backbraketime);
 
 void turnangle(int16_t angle);
 
-void exline(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime);
-void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime);
+void exline(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backbraketime);
+void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backbraketime);
 
 void servo(uint8_t pin, uint16_t deg);
 void pickdn(uint16_t timedelay);
