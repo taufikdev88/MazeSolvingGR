@@ -2483,16 +2483,12 @@ void linetline(uint16_t runtime, uint8_t startSpeed, uint8_t method, uint8_t dir
 void slineFunc(uint16_t sensor, int16_t speed, int16_t backbraketime, int8_t dir)
 {
   cleanSensor();
-  bool line = false; // tandai sesor yang diinginkan belum ketemu
-  while (!line) // selamat belum ketemu
+  bool line = false;
+  while (!line)
   {
-    readSensor(iTF ? ff : bb); // baca sensor, senData[]
-    uint16_t l = 0; // siapkan variable penampung sensor dalam bentuk unsigned integer
-    senData2Bin(&l); // ubah data array sensor ke dalam variable l 0000000011 
-    // 0b00011  iki sing tak pengen sensor2 + sensor1
-    // 0b00010  iki kondisi asli sensor
-    // di and
-    // 0b00010 hasil and
+    readSensor(iTF ? ff : bb); 
+    uint16_t l = 0; 
+    senData2Bin(&l);
     if ((l & sensor) == sensor)
       line = true;
     switch (dir)
