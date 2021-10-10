@@ -112,8 +112,9 @@ const StrFormat InfoLineMissing{1285, 12};
 #define rsensor Serial2
 #define imuserial Serial3
 #define none -1
-#define leftSide 0
-#define rightSide 1
+#define centerSide 0
+#define leftSide 1
+#define rightSide 2
 #define sideAvoidance 0
 // variable global untuk menyimpan konfig user
 bool iUB = true;  // is use buzzer, apakah user mau menggunakan buzzer
@@ -565,11 +566,11 @@ bool readBtn(uint8_t p)
  * gunakan fungsi ini disetiap akhir fungsi yang dijalankan oleh user, yang menandakan pergantian fungsi
  * fungsi ini sudah dilengkapi dengan pengecekan apakah user mengaktifkan buzzer / mematikan buzzer
  * 
- * useBuzzerOn();
+ * usebuzzeron();
  * *beberapa fungsi didalam sini 
  * useBuzzerOff();
  */
-void useBuzzerOn()
+void usebuzzeron()
 {
   if (iUB)
   {
@@ -1183,6 +1184,32 @@ int16_t rightlineError(bool supermode = false)
   return error;
 }
 /*
+ * fungsi ini digunakan untuk menjalankan pid tetapi berbeda dengan controllerRun, jika controllerRun error jika kehilangan garis
+ * maka fungsi ini tidak akan menghasilkan error saat tidak mendeteksi garis
+ */
+void controllerNoErrorRun(int16_t speed, uint16_t runtime, bool supermode, int16_t dir)
+{
+  cleanSensor();
+  unsigned long timeStart = millis();
+  while ((unsigned long)millis() - timeStart < runtime)
+  {
+    int16_t pwm = 0;
+    int16_t error = 0;
+    switch (dir)
+    {
+      case rightSide: error = rightlineError(supermode); break;
+      case leftSide: error = leftlineError(supermode); break;
+    }
+    pwm = Kp * error + Kd * (error - dError);
+    pwm = constrain(pwm, -255, 255);
+    dError = error;
+    int16_t spdl = speed + pwm;
+    int16_t spdr = speed - pwm;
+    kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
+  }
+  kinematik(0, 0);
+}
+/*
  * fungsi ini akan mengaktifkan pid sensor agar robot mengikuti garis terus menerus
  * fungsi ini digunakan di beberapa fungsi lain seperti detectorRun, lineDelay, dll
  */
@@ -1312,7 +1339,7 @@ void controllerRun(uint16_t line, int16_t speed, bool useError = true)
  * fungsi ini digunakan untuk robot setelah selesai menjalankan fungsi line, lined, linet, linedelay apakah mau maju sedikit atau mundur sedikit
  * tujuannya adalah untuk mengoreksi posisi robot
  */
-void backBrakeTimeFunc(int16_t speed, int16_t brakeTime, bool useError = true)
+void backbraketimeFunc(int16_t speed, int16_t brakeTime, bool useError = true)
 {
   unsigned long timeStart = millis();
   while ((unsigned long)millis() - timeStart < brakeTime)
@@ -1531,8 +1558,8 @@ void detectorRun(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, 
     kinematik(0, 0);
     break;
   }
-  useBuzzerOn();
-  backBrakeTimeFunc(speed, brakeTime);
+  usebuzzeron();
+  backbraketimeFunc(speed, brakeTime);
   crossDetected = false;
   switch (dir)
   {
@@ -1597,26 +1624,26 @@ void linetFunc(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, ui
 /*
  * fungsi dasar linedelay tanpa log, fungsi ini ada karena fungsi ini digunakan oleh beberapa fungsi lain seperti linedelay, linedline
  */
-void linedelayFunc(int16_t speed, uint16_t runTime, int16_t brakeTime)
+void linedelayFunc(int16_t speed, uint16_t runtime, int16_t backbraketime)
 {
   unsigned long timeStart = millis();
   cleanSensor();
-  while ((unsigned long)millis() - timeStart < runTime)
+  while ((unsigned long)millis() - timeStart < runtime)
   {
     readSensor(iTF ? ff : bb);
     uint16_t l = 0;
     senData2Bin(&l);
     controllerRun(l, speed);
   }
-  useBuzzerOn();
-  backBrakeTimeFunc(speed, brakeTime);
+  usebuzzeron();
+  backbraketimeFunc(speed, backbraketime);
   kinematik(0, 0);
   useBuzzerOff();
 }
 /*
  * fungsi dasar tanpa log, fungsi ini ada karena fungsi ini digunakan oleh beberapa fungsi lain seperti motorcm, motorcmdetectcolor
  */
-void motorcmFunc(int16_t speed, uint16_t cm, uint16_t backBrakeTime, int8_t method = none)
+void motorcmFunc(int16_t speed, uint16_t cm, uint16_t backbraketime, int8_t method = none)
 {
   uint32_t step = 15 * cm;
   counterR = 0;
@@ -1639,8 +1666,8 @@ void motorcmFunc(int16_t speed, uint16_t cm, uint16_t backBrakeTime, int8_t meth
 
     kinematik((iTF ? speed : -speed), (iTF ? speed : -speed));
   }
-  useBuzzerOn();
-  backBrakeTimeFunc(speed, backBrakeTime);
+  usebuzzeron();
+  backbraketimeFunc(speed, backbraketime);
   useBuzzerOff();
 }
 // **********************************************************************************************
@@ -1649,7 +1676,7 @@ void motorcmFunc(int16_t speed, uint16_t cm, uint16_t backBrakeTime, int8_t meth
  * fungsi dasar agar robot belok kearah yang ditentukan sampai sensor yang digunakan mendeteksi garis, fungsi ini digunalan oleh 
  * beberapa fungsi lain seperti left, left1-left7, right, right10-right4
  */
-void turn(bool dir, uint8_t sensor, int16_t speed, uint16_t brakeTime)
+void turn(bool dir, uint8_t sensor, int16_t speed, uint16_t backbraketime)
 {
   readSensor(iTF ? ff : bb);
   while (!senData[sensor])
@@ -1666,9 +1693,9 @@ void turn(bool dir, uint8_t sensor, int16_t speed, uint16_t brakeTime)
     }
   }
   kinematik(0, 0);
-  useBuzzerOn();
+  usebuzzeron();
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < brakeTime)
+  while ((unsigned long)millis() - timeStart < backbraketime)
   {
     switch (dir)
     {
@@ -1686,7 +1713,7 @@ void turn(bool dir, uint8_t sensor, int16_t speed, uint16_t brakeTime)
 /*
  * fungsi dasar yang digunakan untuk memutar robot sampai hitungan encoder tercapai
  */
-void turnenc(bool dir, uint16_t speed, uint16_t count, uint16_t backBrakeTime)
+void turnenc(bool dir, uint16_t speed, uint16_t count, uint16_t backbraketime)
 {
   counterL = 0;
   counterR = 0;
@@ -1701,9 +1728,9 @@ void turnenc(bool dir, uint16_t speed, uint16_t count, uint16_t backBrakeTime)
       kinematik(speed, -speed);
   }
   kinematik(0, 0);
-  useBuzzerOn();
+  usebuzzeron();
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < backBrakeTime)
+  while ((unsigned long)millis() - timeStart < backbraketime)
   {
     switch (dir)
     {
@@ -2018,7 +2045,7 @@ void bbspeed(uint8_t l, uint8_t r)
 /*
  * fungsi untuk user memajukan / memundurkan robot selama waktu yang diatur tanpa membaca sensor garis
  */
-void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime)
+void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runtime)
 {
   if (iMC)
     return;
@@ -2028,13 +2055,13 @@ void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime)
   if (debugMode != no_debug)
   {
     char d[FuncMotor.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncMotor).c_str(), nFunc, leftSpeed, rightSpeed, runTime);
+    sprintf(d, getStringFormat(FuncMotor).c_str(), nFunc, leftSpeed, rightSpeed, runtime);
     log(d);
   };
   if (debugMode == by_func)
     waitKey4();
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < runTime)
+  while ((unsigned long)millis() - timeStart < runtime)
   {
     kinematik(leftSpeed, rightSpeed);
   }
@@ -2042,7 +2069,7 @@ void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime)
 /*
  * fungsi untuk membuat robot maju/mundur sejauh jarak cm yang diatur tanpa membaca sensor garis
  */
-void motorcmavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
+void motorcmavoider(int16_t speed, uint16_t cm, uint16_t backbraketime)
 {
   if (iMC)
    return;
@@ -2051,12 +2078,12 @@ void motorcmavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
     return;
   if (debugMode == by_func)
     waitKey4();
-  motorcmFunc(speed, cm, backBrakeTime, sideAvoidance);
+  motorcmFunc(speed, cm, backbraketime, sideAvoidance);
 }
 /*
  * fungsi untuk membuat robot maju/mundur sejauh jarak cm yang diatur tanpa membaca sensor garis
  */
-void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
+void motorcm(int16_t speed, uint16_t cm, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2065,20 +2092,14 @@ void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
     return;
   if (debugMode == by_func)
     waitKey4();
-  motorcmFunc(speed, cm, backBrakeTime);
+  motorcmFunc(speed, cm, backbraketime);
 }
+
 /*
  * fungsi untuk membuat robot maju/mundur dengan kecepatan rpm yang diatur selama waktu yang ditentukan tanpa membaca sensor garis
  */
-void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
+void motorrpmFunc(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime, bool isAvoider)
 {
-  if (iMC)
-    return;
-  nFunc++;
-  if (mStep < nStep)
-    return;
-  if (debugMode == by_func)
-    waitKey4();
   int16_t spdl = 0;
   int16_t spdr = 0;
   float iErrorL = 0;
@@ -2087,13 +2108,13 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
   float dErrorR = 0;
   cleanSensor();
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < runTime)
+  while ((unsigned long)millis() - timeStart < runtime)
   {
     float rpmL = getRPML();
     float rpmR = getRPMR();
 
-    float lError = rpmSpeed - rpmL;
-    float rError = rpmSpeed - rpmR;
+    float lError = spmspeed - rpmL;
+    float rError = spmspeed - rpmR;
 
     float outL = KpMotor * lError + KiMotor * iErrorL + KdMotor * (lError - dErrorL);
     float outR = KpMotor * rError + KiMotor * iErrorR + KdMotor * (rError - dErrorR);
@@ -2112,15 +2133,18 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
     spdl = constrain(spdl, -255, 255);
     spdr = constrain(spdr, -255, 255);
 
-    int16_t* spd = sidelineError();
-    if (spd[0] == 404 && spd[1] == 404) // robot mendeteksi garis di tengah tengah sensor bisa jadi karena menabrak garis yang melintang di depannya
+    if (isAvoider)
     {
-      break;
+      int16_t* spd = sidelineError();
+      if (spd[0] == 404 && spd[1] == 404) // robot mendeteksi garis di tengah tengah sensor bisa jadi karena menabrak garis yang melintang di depannya
+      {
+        break;
+      }
+      if (spd[0] != 0)
+        spdl = spd[0];
+      if (spd[1] != 0)
+        spdr = spd[1];
     }
-    if (spd[0] != 0)
-      spdl = spd[0];
-    if (spd[1] != 0)
-      spdr = spd[1];
 
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
     delay(10);
@@ -2128,12 +2152,41 @@ void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime)
   kinematik(0, 0);
 }
 /*
+ * fungsi untuk membuat robot maju/mundur dengan kecepatan rpm yang diatur selama waktu yang ditentukan tanpa membaca sensor garis
+ */
+void motorrpm(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime)
+{
+  if (iMC)
+    return;
+  nFunc++;
+  if (mStep < nStep)
+    return;
+  if (debugMode == by_func)
+    waitKey4();
+  motorrpmFunc(spmspeed, runtime, backbraketime, false);
+}
+/*
+ * fungsi untuk membuat robot maju/mundur dengan kecepatan rpm yang diatur selama waktu yang ditentukan tanpa membaca sensor garis 
+ * dan menghindari garis
+ */
+void motorrpmavoider(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime)
+{
+  if (iMC)
+    return;
+  nFunc++;
+  if (mStep < nStep)
+    return;
+  if (debugMode == by_func)
+    waitKey4();
+  motorrpmFunc(spmspeed, runtime, backbraketime, true);
+}
+/*
  * fungsi untuk membuat robot maju/mundur dengan kecepatan yang diatur dan selama waktu yang telah ditentukan 
  * jika robot mendeteksi warna (menggunakan huskylens) maka robot akan berhenti
- * jika avoidActive diatur ke true, jika robot mendeteksi garis maka robot akan menghindari garis tersebut
+ * jika avoidactive diatur ke true, jika robot mendeteksi garis maka robot akan menghindari garis tersebut
  * colorId adalah id warna yang telah diatur di husky lens
  */
-int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive, int8_t colorId)
+int8_t motorrpmdetectcolor(uint16_t spmspeed, uint16_t runtime, bool avoidactive, int8_t colorId)
 {
   if (iMC)
     return 0;
@@ -2152,7 +2205,7 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive
   cleanSensor();
   int8_t colordetected = 0;
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < runTime)
+  while ((unsigned long)millis() - timeStart < runtime)
   {
     packet = readHusky(bb, 'C');
     if (packet.id != 0)
@@ -2175,8 +2228,8 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive
     float rpmL = getRPML();
     float rpmR = getRPMR();
 
-    float lError = rpmSpeed - rpmL;
-    float rError = rpmSpeed - rpmR;
+    float lError = spmspeed - rpmL;
+    float rError = spmspeed - rpmR;
 
     float outL = KpMotor * lError + KiMotor * iErrorL + KdMotor * (lError - dErrorL);
     float outR = KpMotor * rError + KiMotor * iErrorR + KdMotor * (rError - dErrorR);
@@ -2206,10 +2259,10 @@ int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive
 }
 /*
  * fungsi untuk membuat robot maju dengan kecepatan tertentu selama waktu yang telah ditentukan
- * jika robot mendeteksi qrcode maka robot akan berhenti walaupun runTime belum tercapai
- * jika avoidActive maka robot akan selalu menghidari jika ada garis 
+ * jika robot mendeteksi qrcode maka robot akan berhenti walaupun runtime belum tercapai
+ * jika avoidactive maka robot akan selalu menghidari jika ada garis 
  */
-String motorrpmdetectqr(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive)
+String motorrpmdetectqr(uint16_t spmspeed, uint16_t runtime, bool avoidactive)
 {
   if (iMC)
     return "MODECOUNT";
@@ -2223,7 +2276,7 @@ String motorrpmdetectqr(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive)
 /*
  * robot akan bergerak maju/mundur sejauh jarak yang ditentukan dan menghindari garis
  */
-void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
+void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2232,7 +2285,7 @@ void motorsideavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime)
     return;
   if (debugMode == by_func)
     waitKey4();
-  motorcmFunc(speed, cm, backBrakeTime, sideAvoidance);
+  motorcmFunc(speed, cm, backbraketime, sideAvoidance);
 }
 /*
  * robot akan berjalan lurus dengan kecepatan yang telah diatur sejauh jarak yang ditentukan
@@ -2248,7 +2301,7 @@ void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t thresho
   if (debugMode == by_func)
     waitKey4();
   // menyamakan heading aktual dengan referensi
-  useBuzzerOn();
+  usebuzzeron();
   while (abs(headingRef - heading) > threshold)
   {
     imusense();
@@ -2334,7 +2387,7 @@ void timeline(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uin
     detectorRun(method, dir, speed, brakeTime, -1);
   }
 }
-void linedelay(int16_t speed, uint16_t runTime, int16_t backBrakeTime)
+void linedelay(int16_t speed, uint16_t runtime, int16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2344,12 +2397,12 @@ void linedelay(int16_t speed, uint16_t runTime, int16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLineDelay.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLineDelay).c_str(), nFunc, speed, runTime, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLineDelay).c_str(), nFunc, speed, runtime, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  linedelayFunc(speed, runTime, backBrakeTime);
+  linedelayFunc(speed, runtime, backbraketime);
 }
 void linefind(int16_t leftSpeed, int16_t rightSpeed, uint16_t timeToDisregardLine)
 {
@@ -2366,7 +2419,7 @@ void linefind(int16_t leftSpeed, int16_t rightSpeed, uint16_t timeToDisregardLin
   }
   if (debugMode == by_func)
     waitKey4();
-  useBuzzerOn();
+  usebuzzeron();
   bool isFound = false;
   cleanSensor();
   unsigned long timeStart = millis();
@@ -2388,7 +2441,7 @@ void linefind(int16_t leftSpeed, int16_t rightSpeed, uint16_t timeToDisregardLin
   kinematik(0, 0);
   useBuzzerOff();
 }
-void linedline(uint16_t runTime, uint16_t startSpeed, uint16_t method, uint16_t dir, uint16_t endSpeed, int16_t brakeTime)
+void linedline(uint16_t runtime, uint16_t startSpeed, uint16_t method, uint16_t dir, uint16_t endSpeed, int16_t brakeTime)
 {
   if (iMC)
     return;
@@ -2398,15 +2451,15 @@ void linedline(uint16_t runTime, uint16_t startSpeed, uint16_t method, uint16_t 
   if (debugMode != no_debug)
   {
     char d[FuncLineDLine.length + 30] = {0};
-    sprintf(d, getStringFormat(FuncLineDLine).c_str(), nFunc, runTime, startSpeed, method, dir, endSpeed, brakeTime);
+    sprintf(d, getStringFormat(FuncLineDLine).c_str(), nFunc, runtime, startSpeed, method, dir, endSpeed, brakeTime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  linedelayFunc(startSpeed, runTime, 0);
+  linedelayFunc(startSpeed, runtime, 0);
   lineFunc(method, dir, endSpeed, brakeTime);
 }
-void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t brakeTime)
+void linetline(uint16_t runtime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t brakeTime)
 {
   if (iMC)
     return;
@@ -2416,29 +2469,16 @@ void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir
   if (debugMode != no_debug)
   {
     char d[FuncLineTLine.length + 30] = {0};
-    sprintf(d, getStringFormat(FuncLineTLine).c_str(), nFunc, runTime, startSpeed, method, dir, endSpeed, brakeTime);
+    sprintf(d, getStringFormat(FuncLineTLine).c_str(), nFunc, runtime, startSpeed, method, dir, endSpeed, brakeTime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  linetFunc(method, dir, startSpeed, 0, runTime);
+  linetFunc(method, dir, startSpeed, 0, runtime);
   lineFunc(method, dir, endSpeed, brakeTime);
 }
-void sline(uint8_t sensor, int16_t speed, int16_t backBrakeTime)
+void slineFunc(uint8_t sensor, int16_t speed, int16_t backbraketime, int8_t dir)
 {
-  if (iMC)
-    return;
-  nFunc++;
-  if (mStep < nStep)
-    return;
-  if (debugMode != no_debug)
-  {
-    char d[FuncSLine.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncSLine).c_str(), nFunc, sensor, speed, backBrakeTime);
-    log(d);
-  }
-  if (debugMode == by_func)
-    waitKey4();
   bool line = false;
   while (!line)
   {
@@ -2447,9 +2487,14 @@ void sline(uint8_t sensor, int16_t speed, int16_t backBrakeTime)
     senData2Bin(&l);
     if ((l & sensor) == sensor)
       line = true;
-    controllerRun(l, speed);
+    switch (dir)
+    {
+      case centerSide: controllerRun(l, speed); break;
+      case rightSide: controllerNoErrorRun(speed, 65000, false, rightSide); break;
+      case leftSide: controllerNoErrorRun(speed, 65000, false, leftSide); break;
+    }
   }
-  useBuzzerOn();
+  usebuzzeron();
   while (1)
   {
     readSensor(iTF ? ff : bb);
@@ -2460,10 +2505,61 @@ void sline(uint8_t sensor, int16_t speed, int16_t backBrakeTime)
     controllerRun(l, speed);
   }
   kinematik(0, 0);
-  backBrakeTimeFunc(speed, backBrakeTime);
+  backbraketimeFunc(speed, backbraketime);
   useBuzzerOff();
 }
-void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t backBrakeTime)
+void sline(uint8_t sensor, int16_t speed, int16_t backbraketime)
+{
+  if (iMC)
+    return;
+  nFunc++;
+  if (mStep < nStep)
+    return;
+  if (debugMode != no_debug)
+  {
+    char d[FuncSLine.length + 15] = {0};
+    sprintf(d, getStringFormat(FuncSLine).c_str(), nFunc, sensor, speed, backbraketime);
+    log(d);
+  }
+  if (debugMode == by_func)
+    waitKey4();
+  slineFunc(sensor, speed, backbraketime, centerSide);
+}
+void slineright(uint8_t sensor, uint16_t speed, int16_t backbraketime) 
+{
+  if (iMC)
+    return;
+  nFunc++;
+  if (mStep < nStep)
+    return;
+  if (debugMode != no_debug)
+  {
+    char d[FuncSLine.length + 15] = {0};
+    sprintf(d, getStringFormat(FuncSLine).c_str(), nFunc, sensor, speed, backbraketime);
+    log(d);
+  }
+  if (debugMode == by_func)
+    waitKey4();
+  slineFunc(sensor, speed, backbraketime, rightSide);
+}
+void slineleft(uint8_t sensor, uint16_t speed, int16_t backbraketime) 
+{
+  if (iMC)
+    return;
+  nFunc++;
+  if (mStep < nStep)
+    return;
+  if (debugMode != no_debug)
+  {
+    char d[FuncSLine.length + 15] = {0};
+    sprintf(d, getStringFormat(FuncSLine).c_str(), nFunc, sensor, speed, backbraketime);
+    log(d);
+  }
+  if (debugMode == by_func)
+    waitKey4();
+  slineFunc(sensor, speed, backbraketime, leftSide);
+}
+void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runtime, int16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2473,7 +2569,7 @@ void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t ba
   if (debugMode != no_debug)
   {
     char d[FuncLostLine.length + 30] = {0};
-    sprintf(d, getStringFormat(FuncLostLine).c_str(), nFunc, lostLineTime, speed, runTime, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLostLine).c_str(), nFunc, lostLineTime, speed, runtime, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
@@ -2481,7 +2577,7 @@ void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t ba
   bool flag = false;
   unsigned long detectTime = millis();
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < runTime)
+  while ((unsigned long)millis() - timeStart < runtime)
   {
     readSensor(iTF ? ff : bb);
     uint16_t l = 0;
@@ -2498,8 +2594,8 @@ void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t ba
     controllerRun(l, speed, false);
   }
   kinematik(0, 0);
-  useBuzzerOn();
-  backBrakeTimeFunc(speed, backBrakeTime);
+  usebuzzeron();
+  backbraketimeFunc(speed, backbraketime);
   useBuzzerOff();
 }
 /*
@@ -2516,20 +2612,7 @@ void leftline(int16_t speed, uint16_t runtime, bool supermode)
     return;
   if (debugMode == by_func)
     waitKey4();
-  cleanSensor();
-  unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < runtime)
-  {
-    int16_t pwm = 0;
-    int16_t error = leftlineError(supermode);
-    pwm = Kp * error + Kd * (error - dError);
-    pwm = constrain(pwm, -255, 255);
-    dError = error;
-    int16_t spdl = speed + pwm;
-    int16_t spdr = speed - pwm;
-    kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
-  }
-  kinematik(0, 0);
+  controllerNoErrorRun(speed, runtime, supermode, leftSide);
 }
 /*
  * fungsi agar robot mengikuti garis di sebelah kiri sensor dan berhenti saat mendeteksi qrcode
@@ -2579,25 +2662,12 @@ void rightline(int16_t speed, uint16_t runtime, bool supermode)
     return;
   if (debugMode == by_func)
     waitKey4();
-  cleanSensor();
-  unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < runtime)
-  {
-    int16_t pwm = 0;
-    int16_t error = rightlineError(supermode);
-    pwm = Kp * error + Kd * (error - dError);
-    pwm = constrain(pwm, -255, 255);
-    dError = error;
-    int16_t spdl = speed + pwm;
-    int16_t spdr = speed - pwm;
-    kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
-  }
-  kinematik(0, 0);
+  controllerNoErrorRun(speed, runtime, supermode, rightSide);
 }
 /*
  * robot akan berputar kekiri sampai sensor 2 mendeteksi garis
  */
-void left(int16_t speed, uint16_t backBrakeTime)
+void left(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2607,14 +2677,14 @@ void left(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLeft.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLeft).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLeft).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(leftSide, 1, speed, backBrakeTime);
+  turn(leftSide, 1, speed, backbraketime);
 }
-void left1(int16_t speed, uint16_t backBrakeTime)
+void left1(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2624,14 +2694,14 @@ void left1(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLeft1.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLeft1).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLeft1).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(leftSide, 0, speed, backBrakeTime);
+  turn(leftSide, 0, speed, backbraketime);
 }
-void left2(int16_t speed, uint16_t backBrakeTime)
+void left2(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2641,14 +2711,14 @@ void left2(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLeft2.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLeft2).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLeft2).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(leftSide, 1, speed, backBrakeTime);
+  turn(leftSide, 1, speed, backbraketime);
 }
-void left3(int16_t speed, uint16_t backBrakeTime)
+void left3(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2658,14 +2728,14 @@ void left3(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLeft3.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLeft3).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLeft3).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(leftSide, 2, speed, backBrakeTime);
+  turn(leftSide, 2, speed, backbraketime);
 }
-void left4(int16_t speed, uint16_t backBrakeTime)
+void left4(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2675,14 +2745,14 @@ void left4(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLeft4.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLeft4).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLeft4).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(leftSide, 3, speed, backBrakeTime);
+  turn(leftSide, 3, speed, backbraketime);
 }
-void left5(int16_t speed, uint16_t backBrakeTime)
+void left5(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2692,14 +2762,14 @@ void left5(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLeft5.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLeft5).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLeft5).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(leftSide, 4, speed, backBrakeTime);
+  turn(leftSide, 4, speed, backbraketime);
 }
-void left6(int16_t speed, uint16_t backBrakeTime)
+void left6(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2709,14 +2779,14 @@ void left6(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLeft6.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLeft6).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLeft6).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(leftSide, 5, speed, backBrakeTime);
+  turn(leftSide, 5, speed, backbraketime);
 }
-void left7(int16_t speed, uint16_t backBrakeTime)
+void left7(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2726,17 +2796,17 @@ void left7(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLeft7.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncLeft7).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncLeft7).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(leftSide, 6, speed, backBrakeTime);
+  turn(leftSide, 6, speed, backbraketime);
 }
 /*
  * robot akan berputar ke kiri sampai hitungan encoder yang diatur tercapai dengan kecepatan yang telah diatur
  */
-void leftenc(int16_t speed, uint16_t count, uint16_t backBrakeTime)
+void leftenc(int16_t speed, uint16_t count, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2745,9 +2815,9 @@ void leftenc(int16_t speed, uint16_t count, uint16_t backBrakeTime)
     return;
   if (debugMode == by_func)
     waitKey4();
-  turnenc(leftSide, speed, count, backBrakeTime);
+  turnenc(leftSide, speed, count, backbraketime);
 }
-void right(int16_t speed, uint16_t backBrakeTime)
+void right(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2757,14 +2827,14 @@ void right(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncRight.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncRight).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncRight).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(rightSide, 6, speed, backBrakeTime);
+  turn(rightSide, 6, speed, backbraketime);
 }
-void right10(int16_t speed, uint16_t backBrakeTime)
+void right10(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2774,14 +2844,14 @@ void right10(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncRight10.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncRight10).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncRight10).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(rightSide, 9, speed, backBrakeTime);
+  turn(rightSide, 9, speed, backbraketime);
 }
-void right9(int16_t speed, uint16_t backBrakeTime)
+void right9(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2791,14 +2861,14 @@ void right9(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncRight9.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncRight9).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncRight9).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(rightSide, 8, speed, backBrakeTime);
+  turn(rightSide, 8, speed, backbraketime);
 }
-void right8(int16_t speed, uint16_t backBrakeTime)
+void right8(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2808,14 +2878,14 @@ void right8(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncRight8.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncRight8).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncRight8).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(rightSide, 7, speed, backBrakeTime);
+  turn(rightSide, 7, speed, backbraketime);
 }
-void right7(int16_t speed, uint16_t backBrakeTime)
+void right7(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2825,14 +2895,14 @@ void right7(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncRight7.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncRight7).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncRight7).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(rightSide, 6, speed, backBrakeTime);
+  turn(rightSide, 6, speed, backbraketime);
 }
-void right6(int16_t speed, uint16_t backBrakeTime)
+void right6(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2842,14 +2912,14 @@ void right6(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncRight6.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncRight6).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncRight6).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(rightSide, 5, speed, backBrakeTime);
+  turn(rightSide, 5, speed, backbraketime);
 }
-void right5(int16_t speed, uint16_t backBrakeTime)
+void right5(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2859,14 +2929,14 @@ void right5(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncRight5.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncRight5).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncRight5).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(rightSide, 4, speed, backBrakeTime);
+  turn(rightSide, 4, speed, backbraketime);
 }
-void right4(int16_t speed, uint16_t backBrakeTime)
+void right4(int16_t speed, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2876,17 +2946,17 @@ void right4(int16_t speed, uint16_t backBrakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncRight4.length + 15] = {0};
-    sprintf(d, getStringFormat(FuncRight4).c_str(), nFunc, speed, backBrakeTime);
+    sprintf(d, getStringFormat(FuncRight4).c_str(), nFunc, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  turn(rightSide, 3, speed, backBrakeTime);
+  turn(rightSide, 3, speed, backbraketime);
 }
 /*
  * robot akan berputar ke kanan sesuai dengan jumlah encoder yang diinginkan dengan kecepatan yang telah diatur
  */
-void rightenc(int16_t speed, uint16_t count, uint16_t backBrakeTime)
+void rightenc(int16_t speed, uint16_t count, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2895,7 +2965,7 @@ void rightenc(int16_t speed, uint16_t count, uint16_t backBrakeTime)
     return;
   if (debugMode == by_func)
     waitKey4();
-  turnenc(rightSide, speed, count, backBrakeTime);
+  turnenc(rightSide, speed, count, backbraketime);
 }
 /*
  * robot akan berbelok sesuai sudut yang diinginkan
@@ -2911,7 +2981,7 @@ void turnangle(int16_t angle)
   if (debugMode == by_func)
     waitKey4();
 }
-void exline(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime)
+void exline(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2921,7 +2991,7 @@ void exline(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int
   if (debugMode != no_debug)
   {
     char d[FuncExline.length + 30] = {0};
-    sprintf(d, getStringFormat(FuncExline).c_str(), nFunc, leftMotorSpeed, rightMotorSpeed, sensor, backBrakeTime);
+    sprintf(d, getStringFormat(FuncExline).c_str(), nFunc, leftMotorSpeed, rightMotorSpeed, sensor, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
@@ -2945,16 +3015,16 @@ void exline(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int
       lineDetected = false;
     kinematik((iTF ? leftMotorSpeed : -leftMotorSpeed), (iTF ? rightMotorSpeed : -rightMotorSpeed));
   }
-  useBuzzerOn();
+  usebuzzeron();
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < backBrakeTime)
+  while ((unsigned long)millis() - timeStart < backbraketime)
   {
     kinematik((iTF ? leftMotorSpeed : -leftMotorSpeed), (iTF ? rightMotorSpeed : -rightMotorSpeed));
   }
   kinematik(0, 0);
   useBuzzerOff();
 }
-void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backBrakeTime)
+void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2964,7 +3034,7 @@ void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int
   if (debugMode != no_debug)
   {
     char d[FuncExturn.length + 20] = {0};
-    sprintf(d, getStringFormat(FuncExturn).c_str(), leftMotorSpeed, rightMotorSpeed, sensor, backBrakeTime);
+    sprintf(d, getStringFormat(FuncExturn).c_str(), leftMotorSpeed, rightMotorSpeed, sensor, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
@@ -2980,9 +3050,9 @@ void exturn(int16_t leftMotorSpeed, int16_t rightMotorSpeed, uint8_t sensor, int
     kinematik((iTF ? leftMotorSpeed : -leftMotorSpeed), (iTF ? rightMotorSpeed : -rightMotorSpeed));
   }
   kinematik(0, 0);
-  useBuzzerOn();
+  usebuzzeron();
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < backBrakeTime)
+  while ((unsigned long)millis() - timeStart < backbraketime)
   {
     kinematik((iTF ? leftMotorSpeed : -leftMotorSpeed), (iTF ? rightMotorSpeed : -rightMotorSpeed));
   }
@@ -3017,7 +3087,7 @@ void pickup(uint16_t timedelay)
   if (debugMode == by_func)
     waitKey4();
   servo(6, 120); // sesuaikan
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
@@ -3034,7 +3104,7 @@ void placeup(uint16_t timedelay)
   if (debugMode == by_func)
     waitKey4();
   servo(7, 160); // sesuaikan
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
@@ -3051,7 +3121,7 @@ void pickdn(uint16_t timedelay)
   if (debugMode == by_func)
     waitKey4();
   servo(6, 60); // sesuaikan
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
@@ -3068,7 +3138,7 @@ void placedn(uint16_t timedelay)
   if (debugMode == by_func)
     waitKey4();
   servo(7, 90); // sesuaikan
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
@@ -3091,7 +3161,7 @@ void take(uint16_t timedelay)
   servo(6, 120);
   delay(timedelay);
   servo(7, 160);
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
@@ -3114,7 +3184,7 @@ void put(uint16_t timedelay)
   servo(7, 160);
   delay(timedelay);
   servo(6, 120);
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
@@ -3132,7 +3202,7 @@ void camright(uint16_t timedelay)
     waitKey4();
   servo(5, 35); // sesuaikan yaw
   servo(6, 120); // sesuaikan pitch
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
@@ -3149,7 +3219,7 @@ void camfront(uint16_t timedelay)
   if (debugMode == by_func)
     waitKey4();
   servo(5, 130); // sesuaikan
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
@@ -3166,7 +3236,7 @@ void camleft(uint16_t timedelay)
   if (debugMode == by_func)
     waitKey4();
   servo(5, 210); // sesuaikan
-  useBuzzerOn();
+  usebuzzeron();
   delay(timedelay);
   useBuzzerOff();
 }
