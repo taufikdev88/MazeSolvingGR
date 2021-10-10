@@ -99,7 +99,9 @@ void bbspeed(uint8_t l, uint8_t r);
 
 void motor(int16_t leftSpeed, int16_t rightSpeed, uint16_t runTime);
 void motorcm(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
+void motorcmavoider(int16_t speed, uint16_t cm, uint16_t backBrakeTime);
 void motorrpm(uint16_t rpmSpeed, uint16_t runTime, uint16_t backBrakeTime);
+void motorrpmavoider(uint rpmSpeed, uint16_t runTime, uint16_t backBrakeTime);
 int8_t motorrpmdetectcolor(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive, int8_t colorId);
 String motorrpmdetectqr(uint16_t rpmSpeed, uint16_t runTime, bool avoidActive);
 
@@ -116,6 +118,8 @@ void linedline(uint16_t runTime, uint16_t startSpeed, uint16_t method, uint16_t 
 void linetline(uint16_t runTime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t brakeTime);
 
 void sline(uint8_t sensor, int16_t speed, int16_t backBrakeTime);
+void slineright(uint8_t sensor, int16_t speed, int16_t backBrakeTime);
+void slineleft(uint8_t sensor, int16_t speed, int16_t backBrakeTime);
 void lostline(uint16_t lostLineTime, int16_t speed, uint16_t runTime, int16_t backBrakeTime);
 
 void leftline(int16_t speed, uint16_t runtime, bool supermode = false);
@@ -158,8 +162,10 @@ void camright(uint16_t timedelay);
 void camfront(uint16_t timedelay);
 void camleft(uint16_t timedelay);
 
-uint8_t camdetectcolor(bool whichSensor);
-String raspidetectqr(bool whichSensor, int8_t t);
+// ws -> which sensor (ff/bb) ff=front, bb=back 
+uint8_t camdetectcolor(bool ws);
+String gm66detectqr(bool ws, int8_t t);
+String raspidetectqr(bool ws, int8_t t);
 void showonlcd(String data);
 void delay_maze(uint32_t delayMilli);
 
