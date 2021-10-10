@@ -1,6 +1,9 @@
 #include "MazeSolvingGR.h"
 
-void initMazeRobot(){ // fungsi untuk inisialisasi 
+void setup(){ // fungsi untuk inisialisasi 
+  /**************************
+   * Letakkan fungsi fungsi inisialisasi di sini
+   **************************/
   start(1,100); // mulai robot dengan menggunakan buzzer dan set pcTime ke 100ms, bisa diatur sesuai kebutuhan
   error(1,200); // gunakan fungsi error agar saat robot keluar jalur lebih dari 200ms, robot akan berhenti
   
@@ -9,6 +12,11 @@ void initMazeRobot(){ // fungsi untuk inisialisasi
   linecolor(black); // atur robot untuk memulai dengan garis berwarna hitam
   pid1(); // kp dan kd default untuk sensor garis (tersedia pid1() ~ pid7() ) gunakan perintah controller(kp, kd) untuk custom sendiri
   motorPid1();
+
+  /*************************
+   * Kode dibawah ini jangan dihapus
+   *************************/
+  initMazeRobot(); // inisialisasi semua module maze robot
 }
 
 void mode1(){
