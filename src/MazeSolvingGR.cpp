@@ -270,7 +270,7 @@ PacketHusky readHusky(bool ws, char md)
   bool rto = false;
   while (!os->available())
   {
-    if ((unsigned long)millis() - timestart > 10)
+    if ((unsigned long)millis() - timestart > 1000)
     {
       rto = true;
       break;
@@ -358,6 +358,7 @@ PacketHusky readHusky(bool ws, char md)
       }
     }
     pcnt++;
+    delay(1);
   }
   return p;
 }
@@ -862,13 +863,15 @@ void errorRaised()
  * 
  * int16_t *spd = sidelineError();
  * 
- * spd[0] = adalah nilai kecepatan motor kiri yang didapatkan dari sidelineError
- * spd[1] = adalah nilai kecepatan motor kanan yang didapatkan dari sidelineError
+ * *(spd) = adalah nilai kecepatan motor kiri yang didapatkan dari sidelineError
+ * *(spd+1) = adalah nilai kecepatan motor kanan yang didapatkan dari sidelineError
  */
 // error saat menggunakan avoider
 int16_t* sidelineError(bool supermode = false){
   int16_t error = 0;
-  int16_t spd[2] = {0};
+  static int16_t spd[2];
+  spd[0] = 0;
+  spd[1] = 0;
   readSensor(iTF ? ff : bb);
   uint16_t l = 0;
   senData2Bin(&l);
@@ -876,25 +879,25 @@ int16_t* sidelineError(bool supermode = false){
   switch (l)
   {
   case 0b1000000000:
-    spd[1] = 35;
+    spd[1] = 21;
     break;
   case 0b1100000000:
-    spd[1] = 30;
+    spd[1] = 18;
     break;
   case 0b0100000000:
-    spd[1] = 25;
-    break;
-  case 0b0110000000:
-    spd[1] = 20;
-    break;
-  case 0b0010000000:
     spd[1] = 15;
     break;
+  case 0b0110000000:
+    spd[1] = 12;
+    break;
+  case 0b0010000000:
+    spd[1] = 9;
+    break;
   case 0b0011000000:
-    spd[1] = 10;
+    spd[1] = 6;
     break;
   case 0b0001000000:
-    spd[1] = 5;
+    spd[1] = 3;
     break;
   case 0b0001100000:
     spd[1] = 0;
@@ -913,25 +916,25 @@ int16_t* sidelineError(bool supermode = false){
     center = true;
     break;
   case 0b0000001000:
-    spd[0] = 5;
+    spd[0] = 3;
     break;
   case 0b0000001100:
-    spd[0] = 10;
+    spd[0] = 6;
     break;
   case 0b0000000100:
-    spd[0] = 15;
+    spd[0] = 9;
     break;
   case 0b0000000110:
-    spd[0] = 20;
+    spd[0] = 12;
     break;
   case 0b0000000010:
-    spd[0] = 25;
+    spd[0] = 15;
     break;
   case 0b0000000011:
-    spd[0] = 30;
+    spd[0] = 18;
     break;
   case 0b0000000001:
-    spd[0] = 35;
+    spd[0] = 21;
     break;
   case 0b1000000001:
   case 0b1100000001:
@@ -1187,11 +1190,10 @@ int16_t rightlineError(bool supermode = false)
  * fungsi ini digunakan untuk menjalankan pid tetapi berbeda dengan controllerRun, jika controllerRun error jika kehilangan garis
  * maka fungsi ini tidak akan menghasilkan error saat tidak mendeteksi garis
  */
-void controllerNoErrorRun(int16_t speed, uint16_t runtime, bool supermode, int16_t dir)
+void controllerNoErrorRun(int16_t speed, bool supermode, int16_t dir, uint16_t runtime = 1)
 {
-  cleanSensor();
-  unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < runtime)
+  unsigned long timestart = millis();
+  while ((unsigned long) millis()-timestart <= runtime)
   {
     int16_t pwm = 0;
     int16_t error = 0;
@@ -1207,7 +1209,8 @@ void controllerNoErrorRun(int16_t speed, uint16_t runtime, bool supermode, int16
     int16_t spdr = speed - pwm;
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
   }
-  kinematik(0, 0);
+  if (runtime > 1)
+    kinematik(0,0);
 }
 /*
  * fungsi ini akan mengaktifkan pid sensor agar robot mengikuti garis terus menerus
@@ -1339,15 +1342,15 @@ void controllerRun(uint16_t line, int16_t speed, bool useError = true)
  * fungsi ini digunakan untuk robot setelah selesai menjalankan fungsi line, lined, linet, linedelay apakah mau maju sedikit atau mundur sedikit
  * tujuannya adalah untuk mengoreksi posisi robot
  */
-void backbraketimeFunc(int16_t speed, int16_t brakeTime, bool useError = true)
+void backbraketimeFunc(int16_t speed, int16_t backbraketime, bool useError = true)
 {
   unsigned long timeStart = millis();
-  while ((unsigned long)millis() - timeStart < brakeTime)
+  while ((unsigned long)millis() - timeStart < backbraketime)
   {
     kinematik((iTF ? speed : -speed), (iTF ? speed : -speed));
   }
   timeStart = millis();
-  while ((unsigned long)millis() - timeStart < -brakeTime)
+  while ((unsigned long)millis() - timeStart < -backbraketime)
   {
     readSensor(iTF ? ff : bb);
     uint16_t l = 0x00;
@@ -1361,7 +1364,7 @@ void backbraketimeFunc(int16_t speed, int16_t brakeTime, bool useError = true)
  * ke arah mana robot akan menghadap setelah mendeteksi percabangan
  * fungsi ini digunakan oleh beberapa fungsi lain seperti lineFunc, linetFunc
  */
-void detectorRun(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime)
+void detectorRun(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime, uint16_t actionTime)
 {
   unsigned long detectTime1 = millis();
   unsigned long detectTime2 = millis();
@@ -1559,7 +1562,7 @@ void detectorRun(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, 
     break;
   }
   usebuzzeron();
-  backbraketimeFunc(speed, brakeTime);
+  backbraketimeFunc(speed, backbraketime);
   crossDetected = false;
   switch (dir)
   {
@@ -1610,16 +1613,16 @@ void detectorRun(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, 
 /*
  * fungsi dasar tanpa log dan fungsi ini digunakan oleh beberapa fungsi lain seperti line, timeline, dll
  */
-void lineFunc(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime)
+void lineFunc(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime)
 {
-  detectorRun(method, dir, speed, brakeTime, -1);
+  detectorRun(method, dir, speed, backbraketime, -1);
 }
 /*
  * fungsi dasar linet tanpa log, fungsi ini ada karena fungsi ini digunakan oleh beberapa fungsi lain seperti linet, linetline, timeline
  */
-void linetFunc(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime)
+void linetFunc(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime, uint16_t actionTime)
 {
-  detectorRun(method, dir, speed, brakeTime, actionTime);
+  detectorRun(method, dir, speed, backbraketime, actionTime);
 }
 /*
  * fungsi dasar linedelay tanpa log, fungsi ini ada karena fungsi ini digunakan oleh beberapa fungsi lain seperti linedelay, linedline
@@ -2136,14 +2139,14 @@ void motorrpmFunc(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime, b
     if (isAvoider)
     {
       int16_t* spd = sidelineError();
-      if (spd[0] == 404 && spd[1] == 404) // robot mendeteksi garis di tengah tengah sensor bisa jadi karena menabrak garis yang melintang di depannya
+      if (*(spd) == 404 && *(spd+1) == 404) // robot mendeteksi garis di tengah tengah sensor bisa jadi karena menabrak garis yang melintang di depannya
       {
         break;
       }
-      if (spd[0] != 0)
-        spdl = spd[0];
-      if (spd[1] != 0)
-        spdr = spd[1];
+      if (*(spd) != 0)
+        spdl = *(spd);
+      if (*(spd+1) != 0)
+        spdr = *(spd+1);
     }
 
     kinematik((iTF ? spdl : -spdl), (iTF ? spdr : -spdr));
@@ -2154,7 +2157,7 @@ void motorrpmFunc(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime, b
 /*
  * fungsi untuk membuat robot maju/mundur dengan kecepatan rpm yang diatur selama waktu yang ditentukan tanpa membaca sensor garis
  */
-void motorrpm(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime)
+void motorrpm(uint16_t speed, uint16_t runtime, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2163,13 +2166,13 @@ void motorrpm(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime)
     return;
   if (debugMode == by_func)
     waitKey4();
-  motorrpmFunc(spmspeed, runtime, backbraketime, false);
+  motorrpmFunc(speed, runtime, backbraketime, false);
 }
 /*
  * fungsi untuk membuat robot maju/mundur dengan kecepatan rpm yang diatur selama waktu yang ditentukan tanpa membaca sensor garis 
  * dan menghindari garis
  */
-void motorrpmavoider(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime)
+void motorrpmavoider(uint16_t speed, uint16_t runtime, uint16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2178,7 +2181,7 @@ void motorrpmavoider(uint16_t spmspeed, uint16_t runtime, uint16_t backbraketime
     return;
   if (debugMode == by_func)
     waitKey4();
-  motorrpmFunc(spmspeed, runtime, backbraketime, true);
+  motorrpmFunc(speed, runtime, backbraketime, true);
 }
 /*
  * fungsi untuk membuat robot maju/mundur dengan kecepatan yang diatur dan selama waktu yang telah ditentukan 
@@ -2332,7 +2335,7 @@ void motorheading(int16_t speed, float headingRef, uint16_t cm, uint16_t thresho
  * robot menjalankan fungsi maze dengan mendeteksi percabangan, melakukan fungsi belok sesuai dir yang telah diatur
  * dan berjalan dengan kecepatan yang telah diatur
  */
-void line(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime)
+void line(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2342,14 +2345,14 @@ void line(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime)
   if (debugMode != no_debug)
   {
     char d[FuncLine.length + 20] = {0};
-    sprintf(d, getStringFormat(FuncLine).c_str(), nFunc, method, dir, speed, brakeTime);
+    sprintf(d, getStringFormat(FuncLine).c_str(), nFunc, method, dir, speed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  lineFunc(method, dir, speed, brakeTime);
+  lineFunc(method, dir, speed, backbraketime);
 }
-void linet(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t actionTime)
+void linet(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime, uint16_t actionTime)
 {
   if (iMC)
     return;
@@ -2359,14 +2362,14 @@ void linet(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16
   if (debugMode != no_debug)
   {
     char d[FuncLineT.length + 30] = {0};
-    sprintf(d, getStringFormat(FuncLineT).c_str(), nFunc, method, dir, speed, brakeTime, actionTime);
+    sprintf(d, getStringFormat(FuncLineT).c_str(), nFunc, method, dir, speed, backbraketime, actionTime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
-  linetFunc(method, dir, speed, brakeTime, actionTime);
+  linetFunc(method, dir, speed, backbraketime, actionTime);
 }
-void timeline(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uint16_t totalActionTime)
+void timeline(uint8_t method, uint8_t dir, int16_t speed, int16_t backbraketime, uint16_t totalActionTime)
 {
   if (iMC)
     return;
@@ -2376,7 +2379,7 @@ void timeline(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uin
   if (debugMode != no_debug)
   {
     char d[FuncTimeline.length + 30] = {0};
-    sprintf(d, getStringFormat(FuncTimeline).c_str(), nFunc, method, dir, speed, brakeTime, totalActionTime);
+    sprintf(d, getStringFormat(FuncTimeline).c_str(), nFunc, method, dir, speed, backbraketime, totalActionTime);
     log(d);
   }
   if (debugMode == by_func)
@@ -2384,7 +2387,7 @@ void timeline(uint8_t method, uint8_t dir, int16_t speed, int16_t brakeTime, uin
   unsigned long startTime = millis();
   while ((unsigned long)millis() - startTime < totalActionTime)
   {
-    detectorRun(method, dir, speed, brakeTime, -1);
+    detectorRun(method, dir, speed, backbraketime, -1);
   }
 }
 void linedelay(int16_t speed, uint16_t runtime, int16_t backbraketime)
@@ -2441,7 +2444,7 @@ void linefind(int16_t leftSpeed, int16_t rightSpeed, uint16_t timeToDisregardLin
   kinematik(0, 0);
   useBuzzerOff();
 }
-void linedline(uint16_t runtime, uint16_t startSpeed, uint16_t method, uint16_t dir, uint16_t endSpeed, int16_t brakeTime)
+void linedline(uint16_t runtime, uint16_t startSpeed, uint16_t method, uint16_t dir, uint16_t endSpeed, int16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2451,15 +2454,15 @@ void linedline(uint16_t runtime, uint16_t startSpeed, uint16_t method, uint16_t 
   if (debugMode != no_debug)
   {
     char d[FuncLineDLine.length + 30] = {0};
-    sprintf(d, getStringFormat(FuncLineDLine).c_str(), nFunc, runtime, startSpeed, method, dir, endSpeed, brakeTime);
+    sprintf(d, getStringFormat(FuncLineDLine).c_str(), nFunc, runtime, startSpeed, method, dir, endSpeed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
   linedelayFunc(startSpeed, runtime, 0);
-  lineFunc(method, dir, endSpeed, brakeTime);
+  lineFunc(method, dir, endSpeed, backbraketime);
 }
-void linetline(uint16_t runtime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t brakeTime)
+void linetline(uint16_t runtime, uint8_t startSpeed, uint8_t method, uint8_t dir, uint8_t endSpeed, int16_t backbraketime)
 {
   if (iMC)
     return;
@@ -2469,51 +2472,61 @@ void linetline(uint16_t runtime, uint8_t startSpeed, uint8_t method, uint8_t dir
   if (debugMode != no_debug)
   {
     char d[FuncLineTLine.length + 30] = {0};
-    sprintf(d, getStringFormat(FuncLineTLine).c_str(), nFunc, runtime, startSpeed, method, dir, endSpeed, brakeTime);
+    sprintf(d, getStringFormat(FuncLineTLine).c_str(), nFunc, runtime, startSpeed, method, dir, endSpeed, backbraketime);
     log(d);
   }
   if (debugMode == by_func)
     waitKey4();
   linetFunc(method, dir, startSpeed, 0, runtime);
-  lineFunc(method, dir, endSpeed, brakeTime);
+  lineFunc(method, dir, endSpeed, backbraketime);
 }
-void slineFunc(uint8_t sensor, int16_t speed, int16_t backbraketime, int8_t dir)
+void slineFunc(uint16_t sensor, int16_t speed, int16_t backbraketime, int8_t dir)
 {
-  bool line = false;
-  while (!line)
+  cleanSensor();
+  bool line = false; // tandai sesor yang diinginkan belum ketemu
+  while (!line) // selamat belum ketemu
   {
-    readSensor(iTF ? ff : bb);
-    uint16_t l = 0;
-    senData2Bin(&l);
+    readSensor(iTF ? ff : bb); // baca sensor, senData[]
+    uint16_t l = 0; // siapkan variable penampung sensor dalam bentuk unsigned integer
+    senData2Bin(&l); // ubah data array sensor ke dalam variable l 0000000011 
+    // 0b00011  iki sing tak pengen sensor2 + sensor1
+    // 0b00010  iki kondisi asli sensor
+    // di and
+    // 0b00010 hasil and
     if ((l & sensor) == sensor)
       line = true;
     switch (dir)
     {
       case centerSide: controllerRun(l, speed); break;
-      case rightSide: controllerNoErrorRun(speed, 65000, false, rightSide); break;
-      case leftSide: controllerNoErrorRun(speed, 65000, false, leftSide); break;
+      case rightSide: controllerNoErrorRun(speed, false, rightSide); break;
+      case leftSide: controllerNoErrorRun(speed, false, leftSide); break;
     }
   }
   usebuzzeron();
-  while (1)
-  {
-    readSensor(iTF ? ff : bb);
-    uint16_t l = 0;
-    senData2Bin(&l);
-    if ((line & sensor) == 0x00)
-      break;
-    controllerRun(l, speed);
-  }
+  // while (1)
+  // {
+  //   readSensor(iTF ? ff : bb);
+  //   uint16_t l = 0;
+  //   senData2Bin(&l);
+  //   if ((l & sensor) == 0x00)
+  //     break;
+  //   switch (dir)
+  //   {
+  //     case centerSide: controllerRun(l, speed); break;
+  //     case rightSide: controllerNoErrorRun(speed, false, rightSide); break;
+  //     case leftSide: controllerNoErrorRun(speed, false, leftSide); break;
+  //   }
+  // }
   kinematik(0, 0);
   backbraketimeFunc(speed, backbraketime);
   useBuzzerOff();
 }
-void sline(uint8_t sensor, int16_t speed, int16_t backbraketime)
+void sline(uint16_t sensor, int16_t speed, int16_t backbraketime)
 {
-  if (iMC)
+  if (iMC) // is mode count, agar saat menghitung jumlahset point, fungsi ini tidak berjalan
     return;
-  nFunc++;
-  if (mStep < nStep)
+  nFunc++; // menandai jumlah fungsi yang telah dijalankan, 
+  if (mStep < nStep) // jika setpoint yang dipilih lebih besar dari setpoint sekarang, maka lgsg keluar
     return;
   if (debugMode != no_debug)
   {
@@ -2525,7 +2538,7 @@ void sline(uint8_t sensor, int16_t speed, int16_t backbraketime)
     waitKey4();
   slineFunc(sensor, speed, backbraketime, centerSide);
 }
-void slineright(uint8_t sensor, uint16_t speed, int16_t backbraketime) 
+void slineright(uint16_t sensor, int16_t speed, int16_t backbraketime) 
 {
   if (iMC)
     return;
@@ -2542,7 +2555,7 @@ void slineright(uint8_t sensor, uint16_t speed, int16_t backbraketime)
     waitKey4();
   slineFunc(sensor, speed, backbraketime, rightSide);
 }
-void slineleft(uint8_t sensor, uint16_t speed, int16_t backbraketime) 
+void slineleft(uint16_t sensor, int16_t speed, int16_t backbraketime) 
 {
   if (iMC)
     return;
@@ -2612,7 +2625,7 @@ void leftline(int16_t speed, uint16_t runtime, bool supermode)
     return;
   if (debugMode == by_func)
     waitKey4();
-  controllerNoErrorRun(speed, runtime, supermode, leftSide);
+  controllerNoErrorRun(speed, supermode, leftSide, runtime);
 }
 /*
  * fungsi agar robot mengikuti garis di sebelah kiri sensor dan berhenti saat mendeteksi qrcode
@@ -2662,7 +2675,7 @@ void rightline(int16_t speed, uint16_t runtime, bool supermode)
     return;
   if (debugMode == by_func)
     waitKey4();
-  controllerNoErrorRun(speed, runtime, supermode, rightSide);
+  controllerNoErrorRun(speed, supermode, rightSide, runtime);
 }
 /*
  * robot akan berputar kekiri sampai sensor 2 mendeteksi garis
@@ -3348,6 +3361,7 @@ void delay_maze(uint32_t delayMilli)
 void setup()
 {
   // serial sensor init
+  Serial.begin(115200);
   fsensor.begin(115200);
   rsensor.begin(115200);
   // i2c communication init
