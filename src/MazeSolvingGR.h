@@ -56,7 +56,6 @@ void initMazeRobot();
 void mode1();
 void mode2();
 void mode3();
-void customloop();
 
 /*
  * Stock functions

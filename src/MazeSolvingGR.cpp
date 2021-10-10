@@ -3354,7 +3354,7 @@ void delay_maze(uint32_t delayMilli)
 }
 // ********************************************************************************
 // ****************************************************************** main function
-void setup()
+void initMazeRobot()
 {
   // serial sensor init
   Serial.begin(115200);
@@ -3520,6 +3520,5 @@ void setup()
 
 void loop()
 {
-  // if any loop method from user
-  customloop();
+  
 }
